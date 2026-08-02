@@ -15,7 +15,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_DIR = ROOT / "outputs"
-EG_PATH = OUTPUT_DIR / "coint" / "metrics.csv"
+EG_PATH = OUTPUT_DIR / "coint_eg_a" / "metrics.csv"
 SIMPLE_PATH = OUTPUT_DIR / "simple" / "metrics.csv"
 COMPARE_DIR = OUTPUT_DIR / "compare"
 OUT_PATH = COMPARE_DIR / "metrics.csv"

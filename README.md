@@ -25,10 +25,12 @@ uv run python scripts/01_download_prices.py
 From the repo root:
 
 ```bash
-uv run python scripts/02_backtest.py --clear-panels           # EG → outputs/coint/
-uv run python scripts/02_backtest.py --simple --clear-panels  # → outputs/simple/
+uv run python scripts/02_backtest.py --screen eg-a --clear-panels   # main
+uv run python scripts/02_backtest.py --screen eg-b --clear-panels
+uv run python scripts/02_backtest.py --screen eg-c --clear-panels
+uv run python scripts/02_backtest.py --simple --clear-panels
 uv run python scripts/03_compare_strategies.py               # → outputs/compare/
-uv run python scripts/04_portfolio_tables.py                 # → outputs/paper/tables|portfolio
+uv run python scripts/04_portfolio_tables.py                 # → outputs/paper/tables|portfolio + compare/
 uv run python scripts/05_plot_figures.py                     # → outputs/paper/figures/
 ```
 
@@ -42,11 +44,10 @@ Daily Yahoo Finance FX spots, 2007-01-01 to 2024-01-01, seven USD crosses
 
 ## Method (sketch)
 
-1. For each directed pair and rolling train/test window, screen log prices with
-   Engle–Granger: statsmodels `adfuller` defaults (`regression='c'`,
-   `autolag='AIC'`), 5% — both legs fail to reject a unit root; OLS residual
-   rejects.
-2. If cointegrated, reuse that OLS slope as the hedge ratio; form the spread
+1. For each **undirected** pair (21 = C(7,2), alphabetical legs) and rolling
+   train/test window, screen log prices with Engle–Granger orientation rule
+   **A** (default; also **B** / **C** via `--screen`), 5%.
+2. If cointegrated under the chosen rule, form the spread
    `log_1 − β·log_2` and standardize with train mean/SD for an OOS z-score.
 3. Trade when |z| exceeds a threshold (long spread if z < −z*, short if z > z*).
    Signals are lagged two days.
@@ -54,14 +55,17 @@ Daily Yahoo Finance FX spots, 2007-01-01 to 2024-01-01, seven USD crosses
    Annualized Sharpe uses **all calendar days** (flat days as 0), so volatility
    is diluted when often out of market. Metrics `trades` = days with nonzero
    signal, not round-trips.
-5. **Paper portfolio:** sum the 42 pair daily returns, divide by 42. Main tables
+5. **Paper portfolio:** sum the 21 pair daily returns, divide by 21. Main tables
    are **unlevered**. A companion table scales each strategy ex-post to **10%
    annualized vol** so return/MDD levels are comparable (Sharpe unchanged).
    Cumulative-return figures scale the EG path to **equal ex-post daily vol** vs
    simple (visuals only). Sortino uses the std of strictly negative daily returns;
    Calmar = ann return / |max DD|.
 
-**Paper subset:** train=257, test=21, z* ∈ {1, 2, 3}, 42 directed pairs (126 configs).
+**Paper subset:** train=257, test=21, z* ∈ {1, 2, 3}, 21 undirected pairs.
+Manuscript uses EG orientation rule **A** only (`--screen eg-a`). Rules B/C remain
+available in code for internal checks but are not reported in the paper.
+Simple = `--screen none` / `--simple`.
 
 ## Outputs
 

@@ -26,7 +26,7 @@ PAPER_DIR = OUTPUT_DIR / "paper"
 FIG_DIR = PAPER_DIR / "figures"
 PORTFOLIO_DIR = PAPER_DIR / "portfolio"
 PRICES_PATH = ROOT / "data" / "fx_prices.parquet"
-METRICS_EG = OUTPUT_DIR / "coint" / "metrics.csv"
+METRICS_EG = OUTPUT_DIR / "coint_eg_a" / "metrics.csv"
 
 # Heatmap axis order (alphabetical by ISO code).
 CURRENCIES = (
