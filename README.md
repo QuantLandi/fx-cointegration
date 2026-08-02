@@ -25,15 +25,15 @@ uv run python scripts/01_download_prices.py
 From the repo root:
 
 ```bash
-uv run python scripts/02_backtest.py --clear-panels           # EG (default)
-uv run python scripts/02_backtest.py --simple --clear-panels  # no EG screen
-uv run python scripts/03_compare_strategies.py               # EG vs simple
+uv run python scripts/02_backtest.py --clear-panels           # EG → outputs/coint/
+uv run python scripts/02_backtest.py --simple --clear-panels  # → outputs/simple/
+uv run python scripts/03_compare_strategies.py               # → outputs/compare/
+uv run python scripts/04_portfolio_tables.py                 # → outputs/paper/tables|portfolio
+uv run python scripts/05_plot_figures.py                     # → outputs/paper/figures/
 ```
 
-`--simple` writes `outputs/metrics_simple.csv` and `outputs/panels_simple/`
-(same z-rule and PnL; every train window gets an OLS hedge ratio). EG outputs
-stay under `metrics_paper.csv` / `panels/`. Compare joins both metrics files
-into `outputs/metrics_compare.csv` (ΔSharpe = EG − simple).
+`04_portfolio_tables.py` also refreshes Sortino / Calmar / max DD on the pair
+metrics CSVs from existing panels (no need to re-run EG just for those columns).
 
 ## Data
 
@@ -54,21 +54,34 @@ Daily Yahoo Finance FX spots, 2007-01-01 to 2024-01-01, seven USD crosses
    Annualized Sharpe uses **all calendar days** (flat days as 0), so volatility
    is diluted when often out of market. Metrics `trades` = days with nonzero
    signal, not round-trips.
+5. **Paper portfolio:** sum the 42 pair daily returns, divide by 42, then scale
+   the EG series so its max drawdown matches the simple strategy
+   (`exp(cumsum)−1` wealth, peak-to-trough). Sortino uses the std of strictly
+   negative daily returns; Calmar = ann return / |max DD|.
 
 **Paper subset:** train=257, test=21, z* ∈ {1, 2, 3}, 42 directed pairs (126 configs).
 
 ## Outputs
 
-- `outputs/metrics_paper.csv` — EG grid (one row per config)
-- `outputs/metrics_simple.csv` — simple grid (`--simple`)
-- `outputs/metrics_compare.csv` — joined EG vs simple (`03_compare_strategies.py`)
-- `outputs/metrics_*.meta.json` — price freeze + strategy + window/z constants
-- `outputs/panels/{leg1}_{leg2}/` — EG panels (e.g. `aud_cad/`)
-- `outputs/panels_simple/{leg1}_{leg2}/` — simple panels
-  - `prices.csv`, `returns.csv`, `spread.csv`, `zscore.csv`
-  - `signal.csv`, `strategy_return.csv`, `strategy_cum_return.csv`
-    (z-dependent files use columns `z_1`, `z_2`, `z_3`)
+```text
+outputs/
+  coint/
+    metrics.csv (+ .meta.json)
+    panels/{leg1}_{leg2}/     # prices, returns, spread, zscore, signal, …
+  simple/
+    metrics.csv (+ .meta.json)
+    panels/{leg1}_{leg2}/
+  compare/
+    metrics.csv               # EG vs simple join (ΔSharpe)
+  paper/
+    tables/                   # Tables 1–6 CSVs
+    portfolio/                # daily / cumulative portfolio series
+    figures/                  # fig01 … fig18
+```
 
 Under EG, `spread` / `zscore` are NaN outside Engle–Granger-pass OOS blocks.
 Under `--simple`, almost all OOS blocks are filled (NaN only before the first
 window or if train std is zero). Strategy files use 0 for flat days.
+
+`outputs/` and `local/` are gitignored. Optional local checks (JAE table
+tolerances, notebook spot checks) live under `local/`.

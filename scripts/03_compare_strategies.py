@@ -15,9 +15,10 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_DIR = ROOT / "outputs"
-EG_PATH = OUTPUT_DIR / "metrics_paper.csv"
-SIMPLE_PATH = OUTPUT_DIR / "metrics_simple.csv"
-OUT_PATH = OUTPUT_DIR / "metrics_compare.csv"
+EG_PATH = OUTPUT_DIR / "coint" / "metrics.csv"
+SIMPLE_PATH = OUTPUT_DIR / "simple" / "metrics.csv"
+COMPARE_DIR = OUTPUT_DIR / "compare"
+OUT_PATH = COMPARE_DIR / "metrics.csv"
 
 KEYS = (
     "currency_1",
@@ -72,7 +73,7 @@ def main() -> None:
         ]
     ].sort_values("delta_sharpe", ascending=False)
 
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    COMPARE_DIR.mkdir(parents=True, exist_ok=True)
     out.to_csv(OUT_PATH, index=False)
 
     by_z = out.groupby("z_threshold", sort=True).agg(

@@ -7,8 +7,8 @@
   uv run python scripts/02_backtest.py --simple --clear-panels
 
 Panel layout (per pair):
-  outputs/panels/aud_cad/            # EG (default)
-  outputs/panels_simple/aud_cad/     # --simple
+  outputs/coint/panels/aud_cad/      # EG (default)
+  outputs/simple/panels/aud_cad/     # --simple
     prices.csv, returns.csv, spread.csv, zscore.csv
     signal.csv, strategy_return.csv, strategy_cum_return.csv
   (z-dependent files use columns z_1, z_2, z_3)
@@ -33,8 +33,12 @@ from statsmodels.tools.sm_exceptions import CollinearityWarning
 ROOT = Path(__file__).resolve().parents[1]
 PRICES_PATH = ROOT / "data" / "fx_prices.parquet"
 OUTPUT_DIR = ROOT / "outputs"
-PANELS_DIR = OUTPUT_DIR / "panels"
-PANELS_SIMPLE_DIR = OUTPUT_DIR / "panels_simple"
+COINT_DIR = OUTPUT_DIR / "coint"
+SIMPLE_DIR = OUTPUT_DIR / "simple"
+PANELS_DIR = COINT_DIR / "panels"
+PANELS_SIMPLE_DIR = SIMPLE_DIR / "panels"
+METRICS_COINT_PATH = COINT_DIR / "metrics.csv"
+METRICS_SIMPLE_PATH = SIMPLE_DIR / "metrics.csv"
 
 CURRENCIES = (
     "AUDUSD",
@@ -162,6 +166,42 @@ def apply_threshold(data: pd.DataFrame, threshold: float) -> pd.DataFrame:
     return out
 
 
+def metrics_from_returns(rets: pd.Series) -> dict[str, float]:
+    """Paper/notebook performance metrics on a daily return series.
+
+    Max drawdown uses wealth ``exp(cumsum)-1`` then peak-to-trough.
+    Sortino uses std of strictly negative daily returns (not full-sample
+    downside deviation with zeros).
+    """
+    rets = rets.fillna(0.0)
+    ann_ret = float(rets.mean() * 252)
+    ann_vol = float(rets.std() * np.sqrt(252))
+    sharpe = float(ann_ret / ann_vol) if ann_vol else float("nan")
+    cum = np.exp(rets.cumsum()) - 1.0
+    drawdown = cum - cum.cummax()
+    max_dd = float(drawdown.min()) if len(drawdown) else float("nan")
+    downside = rets[rets < 0.0]
+    downside_std = float(downside.std()) if len(downside) else float("nan")
+    sortino = (
+        float(ann_ret / (downside_std * np.sqrt(252)))
+        if downside_std and not np.isnan(downside_std)
+        else float("nan")
+    )
+    calmar = (
+        float(ann_ret / abs(max_dd))
+        if max_dd and not np.isnan(max_dd)
+        else float("nan")
+    )
+    return {
+        "ann_return": ann_ret,
+        "ann_volatility": ann_vol,
+        "sharpe": sharpe,
+        "sortino": sortino,
+        "calmar": calmar,
+        "max_drawdown": max_dd,
+    }
+
+
 def summarize(
     result: pd.DataFrame,
     a1: str,
@@ -176,19 +216,14 @@ def summarize(
     when the strategy is often out of the market. ``trades`` counts days with
     nonzero signal, not round-trips.
     """
-    rets = result["strategy_return"]
-    ann_ret = float(rets.mean() * 252)
-    ann_vol = float(rets.std() * np.sqrt(252))
-    sharpe = float(ann_ret / ann_vol) if ann_vol else float("nan")
+    m = metrics_from_returns(result["strategy_return"])
     return {
         "currency_1": a1,
         "currency_2": a2,
         "train_window": train_window,
         "test_window": test_window,
         "z_threshold": threshold,
-        "sharpe": sharpe,
-        "ann_return": ann_ret,
-        "ann_volatility": ann_vol,
+        **m,
         "trades": int((result["signal"] != 0).sum()),
     }
 
@@ -325,7 +360,7 @@ def main() -> None:
     parser.add_argument(
         "--simple",
         action="store_true",
-        help="Simple pairs (no EG screen). Writes metrics_simple / panels_simple.",
+        help="Simple pairs (no EG screen). Writes outputs/simple/.",
     )
     parser.add_argument(
         "--clear-panels",
@@ -335,9 +370,10 @@ def main() -> None:
     args = parser.parse_args()
 
     require_coint = not args.simple
+    strategy_dir = COINT_DIR if require_coint else SIMPLE_DIR
     panels_root = PANELS_DIR if require_coint else PANELS_SIMPLE_DIR
+    out_path = METRICS_COINT_PATH if require_coint else METRICS_SIMPLE_PATH
     strategy = "engle_granger" if require_coint else "simple_no_eg_screen"
-    metrics_name = "metrics_paper.csv" if require_coint else "metrics_simple.csv"
 
     if not PRICES_PATH.exists():
         raise FileNotFoundError(
@@ -360,7 +396,7 @@ def main() -> None:
         f"{len(Z_THRESHOLDS)} z = {n_configs} configs"
     )
 
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    strategy_dir.mkdir(parents=True, exist_ok=True)
     # OLS/ADF can emit CollinearityWarning / RuntimeWarning on singular windows;
     # those cases are counted via skipped_eg / skipped_std in run_grid.
     with warnings.catch_warnings():
@@ -370,7 +406,6 @@ def main() -> None:
             prices, require_coint=require_coint, panels_root=panels_root
         )
 
-    out_path = OUTPUT_DIR / metrics_name
     metrics.to_csv(out_path, index=False)
     meta_path = write_metrics_provenance(prices, out_path, strategy=strategy)
     print(f"Saved metrics: {out_path.relative_to(ROOT)} ({len(metrics)} rows)")
