@@ -25,8 +25,15 @@ uv run python scripts/01_download_prices.py
 From the repo root:
 
 ```bash
-uv run python scripts/02_backtest.py --clear-panels  # paper grid (257/21, z=1,2,3)
+uv run python scripts/02_backtest.py --clear-panels           # EG (default)
+uv run python scripts/02_backtest.py --simple --clear-panels  # no EG screen
+uv run python scripts/03_compare_strategies.py               # EG vs simple
 ```
+
+`--simple` writes `outputs/metrics_simple.csv` and `outputs/panels_simple/`
+(same z-rule and PnL; every train window gets an OLS hedge ratio). EG outputs
+stay under `metrics_paper.csv` / `panels/`. Compare joins both metrics files
+into `outputs/metrics_compare.csv` (ΔSharpe = EG − simple).
 
 ## Data
 
@@ -52,12 +59,16 @@ Daily Yahoo Finance FX spots, 2007-01-01 to 2024-01-01, seven USD crosses
 
 ## Outputs
 
-- `outputs/metrics_paper.csv` — one row per config
-- `outputs/metrics_paper.meta.json` — price freeze + window/z constants used
-- `outputs/panels/{leg1}_{leg2}/` — e.g. `aud_cad/` (USD quote implied)
+- `outputs/metrics_paper.csv` — EG grid (one row per config)
+- `outputs/metrics_simple.csv` — simple grid (`--simple`)
+- `outputs/metrics_compare.csv` — joined EG vs simple (`03_compare_strategies.py`)
+- `outputs/metrics_*.meta.json` — price freeze + strategy + window/z constants
+- `outputs/panels/{leg1}_{leg2}/` — EG panels (e.g. `aud_cad/`)
+- `outputs/panels_simple/{leg1}_{leg2}/` — simple panels
   - `prices.csv`, `returns.csv`, `spread.csv`, `zscore.csv`
   - `signal.csv`, `strategy_return.csv`, `strategy_cum_return.csv`
     (z-dependent files use columns `z_1`, `z_2`, `z_3`)
 
-`spread` / `zscore` are NaN outside Engle–Granger-pass OOS blocks (not a
-literal zero residual). Strategy files use 0 for flat days (no position).
+Under EG, `spread` / `zscore` are NaN outside Engle–Granger-pass OOS blocks.
+Under `--simple`, almost all OOS blocks are filled (NaN only before the first
+window or if train std is zero). Strategy files use 0 for flat days.

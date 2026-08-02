@@ -4,9 +4,11 @@
 
   uv run python scripts/02_backtest.py
   uv run python scripts/02_backtest.py --clear-panels
+  uv run python scripts/02_backtest.py --simple --clear-panels
 
 Panel layout (per pair):
-  outputs/panels/aud_cad/
+  outputs/panels/aud_cad/            # EG (default)
+  outputs/panels_simple/aud_cad/     # --simple
     prices.csv, returns.csv, spread.csv, zscore.csv
     signal.csv, strategy_return.csv, strategy_cum_return.csv
   (z-dependent files use columns z_1, z_2, z_3)
@@ -32,6 +34,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PRICES_PATH = ROOT / "data" / "fx_prices.parquet"
 OUTPUT_DIR = ROOT / "outputs"
 PANELS_DIR = OUTPUT_DIR / "panels"
+PANELS_SIMPLE_DIR = OUTPUT_DIR / "panels_simple"
 
 CURRENCIES = (
     "AUDUSD",
@@ -63,6 +66,11 @@ def engle_granger_hedge(y: pd.Series, x: pd.Series) -> float | None:
     return float(fit.params.iloc[1])
 
 
+def ols_hedge(y: pd.Series, x: pd.Series) -> float:
+    """OLS hedge ratio (slope on x) with no cointegration screen."""
+    return float(sm.OLS(y, sm.add_constant(x)).fit().params.iloc[1])
+
+
 def load_pair(prices: pd.DataFrame, a1: str, a2: str) -> pd.DataFrame:
     """Levels + log returns. Keep the leading NaN return for window alignment."""
     price_1 = prices[a1]
@@ -86,11 +94,16 @@ def compute_zscores(
     data: pd.DataFrame,
     train_window: int,
     test_window: int,
+    *,
+    require_coint: bool = True,
 ) -> tuple[pd.DataFrame, dict[str, int]]:
-    """Rolling EG screen; write OOS spread/z-score on test windows that pass.
+    """Rolling OOS spread/z-score on train/test blocks.
 
-    Days outside a passing OOS block keep NaN spread/zscore (not traded).
-    Returns (panel, window_stats) where stats counts screened windows and skips.
+    If ``require_coint`` (default), skip windows that fail Engle–Granger.
+    If False (simple pairs), always use the OLS hedge ratio.
+
+    Days outside an active OOS block keep NaN spread/zscore (not traded).
+    Returns (panel, window_stats).
     """
     out = data.copy()
     spread = pd.Series(np.nan, index=out.index, dtype=float)
@@ -102,10 +115,13 @@ def compute_zscores(
         test = out.iloc[i : i + test_window]
         stats["windows"] += 1
 
-        coef = engle_granger_hedge(train["log_1"], train["log_2"])
-        if coef is None:
-            stats["skipped_eg"] += 1
-            continue
+        if require_coint:
+            coef = engle_granger_hedge(train["log_1"], train["log_2"])
+            if coef is None:
+                stats["skipped_eg"] += 1
+                continue
+        else:
+            coef = ols_hedge(train["log_1"], train["log_2"])
 
         train_spread = train["log_1"] - coef * train["log_2"]
         std = float(train_spread.std())
@@ -193,8 +209,8 @@ def z_col(threshold: float) -> str:
     return f"z_{threshold:g}"
 
 
-def pair_dir(a1: str, a2: str) -> Path:
-    path = PANELS_DIR / f"{leg_code(a1)}_{leg_code(a2)}"
+def pair_dir(a1: str, a2: str, panels_root: Path) -> Path:
+    path = panels_root / f"{leg_code(a1)}_{leg_code(a2)}"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -222,7 +238,12 @@ def save_pair_panels(
     strategy_cum_return.to_csv(out_dir / "strategy_cum_return.csv", index_label="date")
 
 
-def run_grid(prices: pd.DataFrame) -> pd.DataFrame:
+def run_grid(
+    prices: pd.DataFrame,
+    *,
+    require_coint: bool,
+    panels_root: Path,
+) -> pd.DataFrame:
     train_window, test_window = PAPER_WINDOW
     pairs = directed_pairs()
     rows: list[dict] = []
@@ -235,7 +256,10 @@ def run_grid(prices: pd.DataFrame) -> pd.DataFrame:
             flush=True,
         )
         scored, stats = compute_zscores(
-            load_pair(prices, a1, a2), train_window, test_window
+            load_pair(prices, a1, a2),
+            train_window,
+            test_window,
+            require_coint=require_coint,
         )
         for key in totals:
             totals[key] += stats[key]
@@ -244,22 +268,36 @@ def run_grid(prices: pd.DataFrame) -> pd.DataFrame:
             result = apply_threshold(scored, z)
             by_z[z] = result
             rows.append(summarize(result, a1, a2, train_window, test_window, z))
-        save_pair_panels(scored, by_z, pair_dir(a1, a2))
+        save_pair_panels(scored, by_z, pair_dir(a1, a2, panels_root))
 
-    print(
-        "Window screen: "
-        f"{totals['passed']}/{totals['windows']} passed EG, "
-        f"{totals['skipped_eg']} failed EG, "
-        f"{totals['skipped_std']} skipped (zero/NaN train std)",
-        flush=True,
-    )
+    if require_coint:
+        print(
+            "Window screen: "
+            f"{totals['passed']}/{totals['windows']} passed EG, "
+            f"{totals['skipped_eg']} failed EG, "
+            f"{totals['skipped_std']} skipped (zero/NaN train std)",
+            flush=True,
+        )
+    else:
+        print(
+            "Window screen (simple, no EG gate): "
+            f"{totals['passed']}/{totals['windows']} active, "
+            f"{totals['skipped_std']} skipped (zero/NaN train std)",
+            flush=True,
+        )
     return pd.DataFrame(rows)
 
 
-def write_metrics_provenance(prices: pd.DataFrame, metrics_path: Path) -> Path:
+def write_metrics_provenance(
+    prices: pd.DataFrame,
+    metrics_path: Path,
+    *,
+    strategy: str,
+) -> Path:
     """Sidecar JSON recording which price freeze and constants produced metrics."""
     meta = {
         "generated_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "strategy": strategy,
         "metrics_file": metrics_path.relative_to(ROOT).as_posix(),
         "prices_file": PRICES_PATH.relative_to(ROOT).as_posix(),
         "prices_mtime_utc": datetime.fromtimestamp(
@@ -285,28 +323,39 @@ def write_metrics_provenance(prices: pd.DataFrame, metrics_path: Path) -> Path:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
+        "--simple",
+        action="store_true",
+        help="Simple pairs (no EG screen). Writes metrics_simple / panels_simple.",
+    )
+    parser.add_argument(
         "--clear-panels",
         action="store_true",
-        help="Delete outputs/panels before writing.",
+        help="Delete the panels directory for this mode before writing.",
     )
     args = parser.parse_args()
+
+    require_coint = not args.simple
+    panels_root = PANELS_DIR if require_coint else PANELS_SIMPLE_DIR
+    strategy = "engle_granger" if require_coint else "simple_no_eg_screen"
+    metrics_name = "metrics_paper.csv" if require_coint else "metrics_simple.csv"
 
     if not PRICES_PATH.exists():
         raise FileNotFoundError(
             f"Missing {PRICES_PATH}. Run: uv run python scripts/01_download_prices.py"
         )
 
-    if args.clear_panels and PANELS_DIR.exists():
-        shutil.rmtree(PANELS_DIR)
-        print(f"Cleared {PANELS_DIR.relative_to(ROOT)}")
+    if args.clear_panels and panels_root.exists():
+        shutil.rmtree(panels_root)
+        print(f"Cleared {panels_root.relative_to(ROOT)}")
 
     prices = pd.read_parquet(PRICES_PATH)
     prices.index = pd.to_datetime(prices.index)
 
     n_pairs = len(directed_pairs())
     n_configs = n_pairs * len(Z_THRESHOLDS)
+    label = "EG" if require_coint else "simple"
     print(
-        f"Running paper grid: {n_pairs} pairs x "
+        f"Running {label} grid: {n_pairs} pairs x "
         f"window {PAPER_WINDOW[0]}/{PAPER_WINDOW[1]} x "
         f"{len(Z_THRESHOLDS)} z = {n_configs} configs"
     )
@@ -317,14 +366,16 @@ def main() -> None:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=CollinearityWarning)
         warnings.simplefilter("ignore", category=RuntimeWarning)
-        metrics = run_grid(prices)
+        metrics = run_grid(
+            prices, require_coint=require_coint, panels_root=panels_root
+        )
 
-    out_path = OUTPUT_DIR / "metrics_paper.csv"
+    out_path = OUTPUT_DIR / metrics_name
     metrics.to_csv(out_path, index=False)
-    meta_path = write_metrics_provenance(prices, out_path)
+    meta_path = write_metrics_provenance(prices, out_path, strategy=strategy)
     print(f"Saved metrics: {out_path.relative_to(ROOT)} ({len(metrics)} rows)")
     print(f"Saved provenance: {meta_path.relative_to(ROOT)}")
-    print(f"Saved panels:  {n_pairs} pair folders under {PANELS_DIR.relative_to(ROOT)}/")
+    print(f"Saved panels:  {n_pairs} pair folders under {panels_root.relative_to(ROOT)}/")
     print(metrics.sort_values("sharpe", ascending=False).head(10).to_string(index=False))
 
 
