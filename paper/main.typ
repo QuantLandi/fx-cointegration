@@ -168,12 +168,13 @@ cointegration: $y_t$ and $x_t$ share a stationary combination even though each i
 non-stationary. The hedge ratio $hat(beta)$ defines the synthetic spread.
 
 Cointegration is a *relation*, not a directed trading object, so we work with
-$C(7,2) = 21$ unordered pairs. Legs are ordered alphabetically by ticker for a unique
-spread $log P^(1) - beta log P^(2)$. Because the Engle–Granger residual can depend on
-which series is the regressand, each training window tests *both* OLS orientations; among
-orientations that pass at 5%, we keep the one with the clearer residual ADF statistic
-(more negative $t$-stat) and map that hedge into the alphabetical spread. If neither
-orientation passes, the pair is flat for the following test window.
+$C(7,2) = 21$ unordered pairs. Legs are ordered alphabetically by ticker so that each
+pair has a unique synthetic spread $log P^(1) - beta log P^(2)$. The Engle–Granger
+residual can depend on which series is the regressand; as a fixed design choice we
+therefore test *both* OLS orientations on each training window and, among those that
+pass at 5%, retain the orientation with the clearer residual ADF statistic (more negative
+$t$-stat), mapping that hedge into the alphabetical spread. If neither orientation passes,
+the pair is flat for the following test window.
 
 == Mean-reversion strategy
 

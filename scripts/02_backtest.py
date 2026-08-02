@@ -1,17 +1,13 @@
 """Rolling Engle-Granger FX pairs backtest (undirected pairs).
 
 21 unordered pairs, train=257, test=21, z in {1, 2, 3}.
-EG orientation rules A/B/C (default A); --simple / --screen none for always-trade.
+Default: Engle–Granger screen. --simple: always-trade (no EG gate).
 
-  uv run python scripts/02_backtest.py --screen eg-a --clear-panels
-  uv run python scripts/02_backtest.py --screen eg-b --clear-panels
-  uv run python scripts/02_backtest.py --screen eg-c --clear-panels
+  uv run python scripts/02_backtest.py --clear-panels
   uv run python scripts/02_backtest.py --simple --clear-panels
 
 Panel layout (per pair, alphabetical legs):
-  outputs/coint_eg_a/panels/aud_cad/
-  outputs/coint_eg_b/panels/aud_cad/
-  outputs/coint_eg_c/panels/aud_cad/
+  outputs/coint/panels/aud_cad/
   outputs/simple/panels/aud_cad/
 """
 
@@ -34,6 +30,8 @@ from statsmodels.tools.sm_exceptions import CollinearityWarning
 ROOT = Path(__file__).resolve().parents[1]
 PRICES_PATH = ROOT / "data" / "fx_prices.parquet"
 OUTPUT_DIR = ROOT / "outputs"
+COINT_DIR = OUTPUT_DIR / "coint"
+SIMPLE_DIR = OUTPUT_DIR / "simple"
 
 CURRENCIES = (
     "AUDUSD",
@@ -48,31 +46,23 @@ CURRENCIES = (
 PAPER_WINDOW = (257, 21)
 Z_THRESHOLDS = (1.0, 2.0, 3.0)
 
-SCREENS = ("eg-a", "eg-b", "eg-c", "none")
-
-
-def screen_dir(screen: str) -> Path:
-    if screen == "none":
-        return OUTPUT_DIR / "simple"
-    return OUTPUT_DIR / f"coint_{screen.replace('-', '_')}"
-
 
 def engle_granger_detail(
     y: pd.Series, x: pd.Series
-) -> tuple[bool, float | None, float | None, float | None]:
+) -> tuple[bool, float | None, float | None]:
     """EG screen at 5%.
 
-    Returns (passed, slope_on_x, residual_adf_stat, residual_adf_pvalue).
+    Returns (passed, slope_on_x, residual_adf_stat).
     ADF defaults: regression='c', autolag='AIC'. Both legs must fail to reject
     a unit root (p > 0.05); residual must reject (p <= 0.05).
     """
     if adfuller(y)[1] <= 0.05 or adfuller(x)[1] <= 0.05:
-        return False, None, None, None
+        return False, None, None
     fit = sm.OLS(y, sm.add_constant(x)).fit()
     adf_stat, adf_p, *_ = adfuller(fit.resid)
     if adf_p > 0.05:
-        return False, None, None, float(adf_p)
-    return True, float(fit.params.iloc[1]), float(adf_stat), float(adf_p)
+        return False, None, None
+    return True, float(fit.params.iloc[1]), float(adf_stat)
 
 
 def ols_hedge(y: pd.Series, x: pd.Series) -> float:
@@ -90,34 +80,22 @@ def alpha_hedge_from_reverse(beta_rev: float) -> float | None:
 def choose_hedge(
     log_1: pd.Series,
     log_2: pd.Series,
-    screen: str,
+    *,
+    require_coint: bool,
 ) -> float | None:
-    """Return alphabetical hedge γ for spread log_1 - γ log_2, or None if flat.
+    """Alphabetical hedge γ for spread log_1 - γ log_2, or None if flat.
 
-    Legs are already alphabetical (currency_1 < currency_2 by symbol).
-
-    A: both regressions; among passes, pick clearer residual ADF (more negative
-       t-stat); if only one passes, use that; if neither, None.
-    B: alphabetical only (y=log_1, x=log_2).
-    C: both must pass; hedge from alphabetical regression.
-    none: always OLS alphabetical hedge (simple pairs).
+    Legs are already alphabetical. If ``require_coint``, run Engle–Granger on
+    both OLS orientations and keep the passing residual with the more negative
+    ADF statistic (map reverse orientation into the alphabetical spread). If
+    ``require_coint`` is False, always use OLS of log_1 on log_2.
     """
-    if screen == "none":
+    if not require_coint:
         return ols_hedge(log_1, log_2)
 
-    pass_fwd, beta_fwd, stat_fwd, _ = engle_granger_detail(log_1, log_2)
-    pass_rev, beta_rev, stat_rev, _ = engle_granger_detail(log_2, log_1)
-
-    if screen == "eg-b":
-        return beta_fwd if pass_fwd else None
-
-    if screen == "eg-c":
-        if pass_fwd and pass_rev:
-            return beta_fwd
-        return None
-
-    # eg-a
-    candidates: list[tuple[float, float]] = []  # (adf_stat, gamma)
+    candidates: list[tuple[float, float]] = []
+    pass_fwd, beta_fwd, stat_fwd = engle_granger_detail(log_1, log_2)
+    pass_rev, beta_rev, stat_rev = engle_granger_detail(log_2, log_1)
     if pass_fwd and beta_fwd is not None and stat_fwd is not None:
         candidates.append((stat_fwd, beta_fwd))
     if pass_rev and beta_rev is not None and stat_rev is not None:
@@ -126,7 +104,6 @@ def choose_hedge(
             candidates.append((stat_rev, gamma))
     if not candidates:
         return None
-    # More negative ADF statistic = stronger rejection of residual unit root.
     candidates.sort(key=lambda t: t[0])
     return candidates[0][1]
 
@@ -155,13 +132,9 @@ def compute_zscores(
     train_window: int,
     test_window: int,
     *,
-    screen: str,
+    require_coint: bool,
 ) -> tuple[pd.DataFrame, dict[str, int]]:
-    """Rolling OOS spread/z-score on train/test blocks.
-
-    Days outside an active OOS block keep NaN spread/zscore (not traded).
-    Returns (panel, window_stats).
-    """
+    """Rolling OOS spread/z-score on train/test blocks."""
     out = data.copy()
     spread = pd.Series(np.nan, index=out.index, dtype=float)
     zscore = pd.Series(np.nan, index=out.index, dtype=float)
@@ -172,7 +145,9 @@ def compute_zscores(
         test = out.iloc[i : i + test_window]
         stats["windows"] += 1
 
-        coef = choose_hedge(train["log_1"], train["log_2"], screen)
+        coef = choose_hedge(
+            train["log_1"], train["log_2"], require_coint=require_coint
+        )
         if coef is None:
             stats["skipped_eg"] += 1
             continue
@@ -195,11 +170,7 @@ def compute_zscores(
 
 
 def apply_threshold(data: pd.DataFrame, threshold: float) -> pd.DataFrame:
-    """Z-score rule with a 2-day lag. NaN z (inactive window) -> flat.
-
-    PnL is equal-notional: signal * (r1 - r2). The EG hedge ratio is used
-    only to form the spread/z-score, not to size the second leg.
-    """
+    """Z-score rule with a 2-day lag. NaN z (inactive window) -> flat."""
     out = data.copy()
     z = out["zscore"].to_numpy(dtype=float)
     signal = np.select(
@@ -216,12 +187,6 @@ def apply_threshold(data: pd.DataFrame, threshold: float) -> pd.DataFrame:
 
 
 def metrics_from_returns(rets: pd.Series) -> dict[str, float]:
-    """Paper/notebook performance metrics on a daily return series.
-
-    Max drawdown uses wealth ``exp(cumsum)-1`` then peak-to-trough.
-    Sortino uses std of strictly negative daily returns (not full-sample
-    downside deviation with zeros).
-    """
     rets = rets.fillna(0.0)
     ann_ret = float(rets.mean() * 252)
     ann_vol = float(rets.std() * np.sqrt(252))
@@ -259,7 +224,6 @@ def summarize(
     test_window: int,
     threshold: float,
 ) -> dict:
-    """Summary metrics for one config."""
     m = metrics_from_returns(result["strategy_return"])
     return {
         "currency_1": a1,
@@ -273,12 +237,10 @@ def summarize(
 
 
 def undirected_pairs() -> list[tuple[str, str]]:
-    """21 unordered pairs; legs sorted alphabetically by symbol."""
     return [(a, b) if a < b else (b, a) for a, b in combinations(CURRENCIES, 2)]
 
 
 def leg_code(symbol: str) -> str:
-    """AUDUSD -> aud (USD quote is implicit)."""
     if not symbol.endswith("USD"):
         raise ValueError(f"Expected XXXUSD symbol, got {symbol}")
     return symbol[:-3].lower()
@@ -319,7 +281,7 @@ def save_pair_panels(
 def run_grid(
     prices: pd.DataFrame,
     *,
-    screen: str,
+    require_coint: bool,
     panels_root: Path,
 ) -> pd.DataFrame:
     train_window, test_window = PAPER_WINDOW
@@ -337,7 +299,7 @@ def run_grid(
             load_pair(prices, a1, a2),
             train_window,
             test_window,
-            screen=screen,
+            require_coint=require_coint,
         )
         for key in totals:
             totals[key] += stats[key]
@@ -348,18 +310,18 @@ def run_grid(
             rows.append(summarize(result, a1, a2, train_window, test_window, z))
         save_pair_panels(scored, by_z, pair_dir(a1, a2, panels_root))
 
-    if screen == "none":
+    if require_coint:
         print(
-            "Window screen (simple, no EG gate): "
-            f"{totals['passed']}/{totals['windows']} active, "
+            "Window screen: "
+            f"{totals['passed']}/{totals['windows']} passed EG, "
+            f"{totals['skipped_eg']} failed EG, "
             f"{totals['skipped_std']} skipped (zero/NaN train std)",
             flush=True,
         )
     else:
         print(
-            f"Window screen ({screen}): "
-            f"{totals['passed']}/{totals['windows']} passed, "
-            f"{totals['skipped_eg']} failed EG rule, "
+            "Window screen (simple, no EG gate): "
+            f"{totals['passed']}/{totals['windows']} active, "
             f"{totals['skipped_std']} skipped (zero/NaN train std)",
             flush=True,
         )
@@ -371,12 +333,10 @@ def write_metrics_provenance(
     metrics_path: Path,
     *,
     strategy: str,
-    screen: str,
 ) -> Path:
     meta = {
         "generated_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "strategy": strategy,
-        "screen": screen,
         "metrics_file": metrics_path.relative_to(ROOT).as_posix(),
         "prices_file": PRICES_PATH.relative_to(ROOT).as_posix(),
         "prices_mtime_utc": datetime.fromtimestamp(
@@ -403,15 +363,9 @@ def write_metrics_provenance(
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--screen",
-        choices=SCREENS,
-        default="eg-a",
-        help="EG orientation rule or none (simple). Default: eg-a.",
-    )
-    parser.add_argument(
         "--simple",
         action="store_true",
-        help="Alias for --screen none.",
+        help="Simple pairs (no EG screen). Writes outputs/simple/.",
     )
     parser.add_argument(
         "--clear-panels",
@@ -419,16 +373,12 @@ def main() -> None:
         help="Delete the panels directory for this mode before writing.",
     )
     args = parser.parse_args()
-    screen = "none" if args.simple else args.screen
 
-    strategy_root = screen_dir(screen)
+    require_coint = not args.simple
+    strategy_root = COINT_DIR if require_coint else SIMPLE_DIR
     panels_root = strategy_root / "panels"
     out_path = strategy_root / "metrics.csv"
-    strategy = (
-        "simple_no_eg_screen"
-        if screen == "none"
-        else f"engle_granger_{screen}"
-    )
+    strategy = "engle_granger" if require_coint else "simple_no_eg_screen"
 
     if not PRICES_PATH.exists():
         raise FileNotFoundError(
@@ -444,8 +394,9 @@ def main() -> None:
 
     n_pairs = len(undirected_pairs())
     n_configs = n_pairs * len(Z_THRESHOLDS)
+    label = "EG" if require_coint else "simple"
     print(
-        f"Running screen={screen}: {n_pairs} undirected pairs x "
+        f"Running {label} grid: {n_pairs} undirected pairs x "
         f"window {PAPER_WINDOW[0]}/{PAPER_WINDOW[1]} x "
         f"{len(Z_THRESHOLDS)} z = {n_configs} configs"
     )
@@ -454,12 +405,12 @@ def main() -> None:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=CollinearityWarning)
         warnings.simplefilter("ignore", category=RuntimeWarning)
-        metrics = run_grid(prices, screen=screen, panels_root=panels_root)
+        metrics = run_grid(
+            prices, require_coint=require_coint, panels_root=panels_root
+        )
 
     metrics.to_csv(out_path, index=False)
-    meta_path = write_metrics_provenance(
-        prices, out_path, strategy=strategy, screen=screen
-    )
+    meta_path = write_metrics_provenance(prices, out_path, strategy=strategy)
     print(f"Saved metrics: {out_path.relative_to(ROOT)} ({len(metrics)} rows)")
     print(f"Saved provenance: {meta_path.relative_to(ROOT)}")
     print(f"Saved panels:  {n_pairs} pair folders under {panels_root.relative_to(ROOT)}/")

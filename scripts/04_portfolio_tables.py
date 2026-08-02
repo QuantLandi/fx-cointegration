@@ -1,9 +1,7 @@
-"""Build unlevered portfolio tables for 21-pair screens (A/B/C + simple).
+"""Build unlevered portfolio tables for EG vs simple (21 pairs).
 
 Requires:
-  uv run python scripts/02_backtest.py --screen eg-a --clear-panels
-  uv run python scripts/02_backtest.py --screen eg-b --clear-panels
-  uv run python scripts/02_backtest.py --screen eg-c --clear-panels
+  uv run python scripts/02_backtest.py --clear-panels
   uv run python scripts/02_backtest.py --simple --clear-panels
 
   uv run python scripts/04_portfolio_tables.py
@@ -19,22 +17,19 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_DIR = ROOT / "outputs"
+COINT_DIR = OUTPUT_DIR / "coint"
+SIMPLE_DIR = OUTPUT_DIR / "simple"
+PANELS_EG = COINT_DIR / "panels"
+PANELS_SIMPLE = SIMPLE_DIR / "panels"
+METRICS_COINT = COINT_DIR / "metrics.csv"
+METRICS_SIMPLE = SIMPLE_DIR / "metrics.csv"
 PAPER_DIR = OUTPUT_DIR / "paper"
 TABLES_DIR = PAPER_DIR / "tables"
 PORTFOLIO_DIR = PAPER_DIR / "portfolio"
-COMPARE_DIR = OUTPUT_DIR / "compare"
 
 Z_THRESHOLDS = (1.0, 2.0, 3.0)
 N_PAIRS = 21
 TARGET_ANN_VOL = 0.10
-
-# Main EG rule first; simple last.
-SCREENS = (
-    ("eg-a", OUTPUT_DIR / "coint_eg_a"),
-    ("eg-b", OUTPUT_DIR / "coint_eg_b"),
-    ("eg-c", OUTPUT_DIR / "coint_eg_c"),
-    ("simple", OUTPUT_DIR / "simple"),
-)
 
 
 def _load_backtest():
@@ -56,7 +51,7 @@ def list_pair_dirs(panels_root: Path) -> list[Path]:
     if len(dirs) != N_PAIRS:
         raise FileNotFoundError(
             f"Expected {N_PAIRS} pair dirs under {panels_root}, found {len(dirs)}. "
-            "Run scripts/02_backtest.py for this screen first."
+            "Run scripts/02_backtest.py (and --simple) first."
         )
     return dirs
 
@@ -133,10 +128,7 @@ def refresh_pair_metrics(bt, panels_root: Path, metrics_path: Path, strategy: st
     out.to_csv(metrics_path, index=False)
     prices = pd.read_parquet(bt.PRICES_PATH)
     prices.index = pd.to_datetime(prices.index)
-    screen = "none" if strategy == "simple" else strategy
-    bt.write_metrics_provenance(
-        prices, metrics_path, strategy=strategy, screen=screen
-    )
+    bt.write_metrics_provenance(prices, metrics_path, strategy=strategy)
     print(f"Refreshed {metrics_path.relative_to(ROOT)} ({len(out)} rows)")
 
 
@@ -144,120 +136,113 @@ def main() -> None:
     bt = _load_backtest()
     TABLES_DIR.mkdir(parents=True, exist_ok=True)
     PORTFOLIO_DIR.mkdir(parents=True, exist_ok=True)
-    COMPARE_DIR.mkdir(parents=True, exist_ok=True)
 
-    available: list[tuple[str, Path]] = []
-    for name, root in SCREENS:
-        panels = root / "panels"
-        if panels.exists() and any(panels.iterdir()):
-            available.append((name, root))
-        else:
-            print(f"Skip {name}: missing panels under {panels}")
+    refresh_pair_metrics(bt, PANELS_EG, METRICS_COINT, "engle_granger")
+    refresh_pair_metrics(bt, PANELS_SIMPLE, METRICS_SIMPLE, "simple_no_eg_screen")
 
-    if not available:
-        raise FileNotFoundError(
-            "No screen panels found. Run 02_backtest.py for eg-a/b/c and --simple."
-        )
+    scale_rows: list[dict] = []
+    tables_24_rows: list[dict] = []
+    target_vol_rows: list[dict] = []
 
-    for name, root in available:
-        refresh_pair_metrics(bt, root / "panels", root / "metrics.csv", name)
+    for z in Z_THRESHOLDS:
+        eg = load_portfolio_returns(PANELS_EG, z)
+        simple = load_portfolio_returns(PANELS_SIMPLE, z)
+        idx = eg.index.union(simple.index).sort_values()
+        eg = eg.reindex(idx).fillna(0.0)
+        simple = simple.reindex(idx).fillna(0.0)
 
-    unlev_rows: list[dict] = []
-    target_rows: list[dict] = []
-    port: dict[str, dict[float, pd.Series]] = {}
+        eg_m = metrics_row(eg, bt.metrics_from_returns)
+        simple_m = metrics_row(simple, bt.metrics_from_returns)
+        vol_scale = equal_vol_scale(eg, simple)
+        eg_equalvol = eg * vol_scale
 
-    for name, root in available:
-        port[name] = {}
-        for z in Z_THRESHOLDS:
-            rets = load_portfolio_returns(root / "panels", z)
-            port[name][z] = rets
-            m = metrics_row(rets, bt.metrics_from_returns)
-            unlev_rows.append({"screen": name, "z_threshold": z, **m})
+        for side, rets, m_unlev in (
+            ("eg", eg, eg_m),
+            ("simple", simple, simple_m),
+        ):
             lev = target_vol_scale(rets, TARGET_ANN_VOL, bt.metrics_from_returns)
             m_tgt = metrics_row(rets * lev, bt.metrics_from_returns)
-            target_rows.append(
+            target_vol_rows.append(
                 {
-                    "screen": name,
                     "z_threshold": z,
+                    "strategy": side,
                     "target_ann_vol_pct": TARGET_ANN_VOL * 100.0,
                     "scale": lev,
                     **m_tgt,
-                    "sharpe_unlevered": m["sharpe"],
+                    "sharpe_unlevered": m_unlev["sharpe"],
                 }
             )
 
-    unlev = pd.DataFrame(unlev_rows)
-    target = pd.DataFrame(target_rows)
-    unlev.to_csv(COMPARE_DIR / "portfolio_unlevered_21.csv", index=False)
-    target.to_csv(COMPARE_DIR / "portfolio_target_vol_10pct_21.csv", index=False)
-
-    # Keep eg-a vs simple paper artifacts when both exist (for later typst refresh).
-    if "eg-a" in port and "simple" in port:
-        scale_rows: list[dict] = []
-        tables_24_rows: list[dict] = []
-        for z in Z_THRESHOLDS:
-            eg = port["eg-a"][z]
-            simple = port["simple"][z]
-            idx = eg.index.union(simple.index).sort_values()
-            eg = eg.reindex(idx).fillna(0.0)
-            simple = simple.reindex(idx).fillna(0.0)
-            eg_m = metrics_row(eg, bt.metrics_from_returns)
-            simple_m = metrics_row(simple, bt.metrics_from_returns)
-            vol_scale = equal_vol_scale(eg, simple)
-            eg_equalvol = eg * vol_scale
-            scale_rows.append(
-                {
-                    "z_threshold": z,
-                    "equal_vol_scale": vol_scale,
-                    "ann_vol_eg_pct": eg_m["ann_volatility_pct"],
-                    "ann_vol_simple_pct": simple_m["ann_volatility_pct"],
-                    "mdd_eg_pct": eg_m["max_drawdown_pct"],
-                    "mdd_simple_pct": simple_m["max_drawdown_pct"],
-                }
-            )
-            for side, m in (("eg", eg_m), ("simple", simple_m)):
-                tables_24_rows.append({"z_threshold": z, "strategy": side, **m})
-            eg.to_csv(
-                PORTFOLIO_DIR / f"returns_eg_z{z:g}.csv",
-                header=["return"],
-                index_label="date",
-            )
-            simple.to_csv(
-                PORTFOLIO_DIR / f"returns_simple_z{z:g}.csv",
-                header=["return"],
-                index_label="date",
-            )
-            wealth_eqvol = pd.DataFrame(
-                {
-                    "eg_equalvol": np.exp(eg_equalvol.cumsum()) - 1.0,
-                    "simple": np.exp(simple.cumsum()) - 1.0,
-                }
-            )
-            wealth_eqvol.to_csv(
-                PORTFOLIO_DIR / f"cum_return_z{z:g}.csv", index_label="date"
-            )
-            wealth_eqvol.to_csv(
-                PORTFOLIO_DIR / f"cum_return_equalvol_z{z:g}.csv",
-                index_label="date",
-            )
-        pd.DataFrame(scale_rows).to_csv(
-            TABLES_DIR / "equal_vol_scale.csv", index=False
+        scale_rows.append(
+            {
+                "z_threshold": z,
+                "equal_vol_scale": vol_scale,
+                "ann_vol_eg_pct": eg_m["ann_volatility_pct"],
+                "ann_vol_simple_pct": simple_m["ann_volatility_pct"],
+                "mdd_eg_pct": eg_m["max_drawdown_pct"],
+                "mdd_simple_pct": simple_m["max_drawdown_pct"],
+            }
         )
-        tables_24 = pd.DataFrame(tables_24_rows)
-        tables_24.to_csv(TABLES_DIR / "tables_2_4_by_z.csv", index=False)
-        target_eg = target[target["screen"].isin(["eg-a", "simple"])]
-        target_eg.to_csv(TABLES_DIR / "tables_target_vol_10pct.csv", index=False)
+        for side, m in (("eg", eg_m), ("simple", simple_m)):
+            tables_24_rows.append({"z_threshold": z, "strategy": side, **m})
 
-    print("\n=== Unlevered portfolio (/21) ===")
-    print(
-        unlev.pivot(index="z_threshold", columns="screen", values="sharpe")
-        .reindex(columns=[n for n, _ in SCREENS if n in port])
-        .to_string()
+        eg.to_csv(
+            PORTFOLIO_DIR / f"returns_eg_z{z:g}.csv",
+            header=["return"],
+            index_label="date",
+        )
+        simple.to_csv(
+            PORTFOLIO_DIR / f"returns_simple_z{z:g}.csv",
+            header=["return"],
+            index_label="date",
+        )
+        wealth_eqvol = pd.DataFrame(
+            {
+                "eg_equalvol": np.exp(eg_equalvol.cumsum()) - 1.0,
+                "simple": np.exp(simple.cumsum()) - 1.0,
+            }
+        )
+        wealth_eqvol.to_csv(
+            PORTFOLIO_DIR / f"cum_return_z{z:g}.csv", index_label="date"
+        )
+        wealth_eqvol.to_csv(
+            PORTFOLIO_DIR / f"cum_return_equalvol_z{z:g}.csv",
+            index_label="date",
+        )
+
+    scale = pd.DataFrame(scale_rows)
+    tables_24 = pd.DataFrame(tables_24_rows)
+    target_vol = pd.DataFrame(target_vol_rows)
+    scale.to_csv(TABLES_DIR / "equal_vol_scale.csv", index=False)
+    tables_24.to_csv(TABLES_DIR / "tables_2_4_by_z.csv", index=False)
+    target_vol.to_csv(TABLES_DIR / "tables_target_vol_10pct.csv", index=False)
+
+    wide = tables_24.pivot(index="z_threshold", columns="strategy")
+    t5 = pd.DataFrame(
+        {
+            "z_threshold": wide.index,
+            "sharpe_eg": wide[("sharpe", "eg")].values,
+            "sharpe_simple": wide[("sharpe", "simple")].values,
+        }
     )
-    print("\nFull unlevered metrics:")
-    print(unlev.to_string(index=False))
-    print(f"\nSaved {COMPARE_DIR.relative_to(ROOT)}/portfolio_unlevered_21.csv")
-    print(f"Saved {COMPARE_DIR.relative_to(ROOT)}/portfolio_target_vol_10pct_21.csv")
+    t6 = pd.DataFrame(
+        {
+            "z_threshold": wide.index,
+            "max_drawdown_eg_pct": wide[("max_drawdown_pct", "eg")].values,
+            "max_drawdown_simple_pct": wide[("max_drawdown_pct", "simple")].values,
+        }
+    )
+    t5.to_csv(TABLES_DIR / "table5_sharpe.csv", index=False)
+    t6.to_csv(TABLES_DIR / "table6_mdd.csv", index=False)
+
+    print(f"Saved tables under {TABLES_DIR.relative_to(ROOT)}/")
+    print(f"Saved portfolio series under {PORTFOLIO_DIR.relative_to(ROOT)}/")
+    print("\nEqual-vol plot scales (visuals only):")
+    print(scale.to_string(index=False))
+    print("\nTables (unlevered):")
+    print(tables_24.to_string(index=False))
+    print("\nCompanion table (10% target ann. vol, ex-post):")
+    print(target_vol.to_string(index=False))
 
 
 if __name__ == "__main__":

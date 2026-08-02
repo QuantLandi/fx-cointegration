@@ -25,12 +25,10 @@ uv run python scripts/01_download_prices.py
 From the repo root:
 
 ```bash
-uv run python scripts/02_backtest.py --screen eg-a --clear-panels   # main
-uv run python scripts/02_backtest.py --screen eg-b --clear-panels
-uv run python scripts/02_backtest.py --screen eg-c --clear-panels
-uv run python scripts/02_backtest.py --simple --clear-panels
+uv run python scripts/02_backtest.py --clear-panels           # EG → outputs/coint/
+uv run python scripts/02_backtest.py --simple --clear-panels  # → outputs/simple/
 uv run python scripts/03_compare_strategies.py               # → outputs/compare/
-uv run python scripts/04_portfolio_tables.py                 # → outputs/paper/tables|portfolio + compare/
+uv run python scripts/04_portfolio_tables.py                 # → outputs/paper/tables|portfolio
 uv run python scripts/05_plot_figures.py                     # → outputs/paper/figures/
 ```
 
@@ -45,10 +43,11 @@ Daily Yahoo Finance FX spots, 2007-01-01 to 2024-01-01, seven USD crosses
 ## Method (sketch)
 
 1. For each **undirected** pair (21 = C(7,2), alphabetical legs) and rolling
-   train/test window, screen log prices with Engle–Granger orientation rule
-   **A** (default; also **B** / **C** via `--screen`), 5%.
-2. If cointegrated under the chosen rule, form the spread
-   `log_1 − β·log_2` and standardize with train mean/SD for an OOS z-score.
+   train/test window, screen log prices with Engle–Granger at 5%: both OLS
+   orientations are tested; among passes, keep the clearer residual ADF
+   (more negative t-stat) and map the hedge into `log_1 − β·log_2`.
+2. If cointegrated, form that spread and standardize with train mean/SD for an
+   OOS z-score.
 3. Trade when |z| exceeds a threshold (long spread if z < −z*, short if z > z*).
    Signals are lagged two days.
 4. Strategy return = signal × (r₁ − r₂) (**equal notional**, not β-hedged).
@@ -63,9 +62,7 @@ Daily Yahoo Finance FX spots, 2007-01-01 to 2024-01-01, seven USD crosses
    Calmar = ann return / |max DD|.
 
 **Paper subset:** train=257, test=21, z* ∈ {1, 2, 3}, 21 undirected pairs.
-Manuscript uses EG orientation rule **A** only (`--screen eg-a`). Rules B/C remain
-available in code for internal checks but are not reported in the paper.
-Simple = `--screen none` / `--simple`.
+Simple benchmark: `--simple` (no EG gate).
 
 ## Outputs
 
