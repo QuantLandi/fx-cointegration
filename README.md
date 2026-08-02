@@ -32,8 +32,9 @@ uv run python scripts/04_portfolio_tables.py                 # → outputs/paper
 uv run python scripts/05_plot_figures.py                     # → outputs/paper/figures/
 ```
 
-`04_portfolio_tables.py` also refreshes Sortino / Calmar / max DD on the pair
-metrics CSVs from existing panels (no need to re-run EG just for those columns).
+`04_portfolio_tables.py` also refreshes pair `metrics.csv` from existing panels
+(including the `{0,1,2,5}` bp cost grid), so you need not re-run EG just for
+metrics/portfolio tables.
 
 ## Data
 
@@ -73,22 +74,25 @@ cost κ ∈ {0, 1, 2, 5} bp (baseline 2). Simple benchmark: `--simple` (no EG ga
 ```text
 outputs/
   coint/
-    metrics.csv (+ .meta.json)
-    panels/{leg1}_{leg2}/     # prices, returns, spread, zscore, signal, …
+    metrics.csv (+ .meta.json)   # rows × z × cost_bp; panels are gross
+    panels/{leg1}_{leg2}/        # prices, returns, spread, zscore, signal, …
   simple/
     metrics.csv (+ .meta.json)
     panels/{leg1}_{leg2}/
   compare/
-    metrics.csv               # EG vs simple join (ΔSharpe)
+    metrics.csv                  # EG vs simple join (ΔSharpe), keyed by cost_bp
   paper/
-    tables/                   # Tables 1–6 CSVs
-    portfolio/                # daily / cumulative portfolio series
-    figures/                  # fig01 … fig18
+    tables/                      # unlevered / target-vol / cost-sensitivity CSVs
+    portfolio/                   # daily / cumulative series at baseline κ=2
+    figures/                     # fig01–fig05
 ```
 
 Under EG, `spread` / `zscore` are NaN outside Engle–Granger-pass OOS blocks.
 Under `--simple`, almost all OOS blocks are filled (NaN only before the first
-window or if train std is zero). Strategy files use 0 for flat days.
+window or if train std is zero). Strategy return panels are **gross** (zero cost);
+flat days are 0. Net returns apply `(κ/1e4)·|Δsignal|/2` in metrics and `04`.
 
 `outputs/` and `local/` are gitignored. Optional local checks (JAE table
 tolerances, notebook spot checks) live under `local/`.
+
+Typst draft: `paper/main.typ` (figures via `paper/figures` → `outputs/paper/figures`).
