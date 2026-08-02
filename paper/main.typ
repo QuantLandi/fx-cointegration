@@ -230,15 +230,14 @@ figures are visual aids only.
 
 == Descriptive analysis
 
-Per-currency return paths and additional heatmaps (residual skew/kurtosis, pair return,
-volatility, Sortino, Calmar) are omitted for brevity and placed in the online appendix.
+Per-currency return paths and additional descriptive heatmaps are omitted for brevity.
 @fig:sharpe-hm shows pair-level annualized Sharpe ratios at the baseline threshold
 $z^star = 1$. Dispersion across unordered pairs is large; a few crosses (notably some
 GBP and JPY combinations in this sample) dominate the right tail of risk-adjusted
 pair performance.
 
 #figure(
-  image(figpath("fig13_sharpe_heatmap.png"), width: 72%),
+  image(figpath("fig02_sharpe_heatmap.png"), width: 72%),
   caption: [Heatmap of annualized Sharpe ratios by unordered pair ($z^star = 1$, EG-filtered).],
 ) <fig:sharpe-hm>
 
@@ -268,7 +267,7 @@ We compare *unlevered* portfolios at training/testing windows 257/21. @tbl:z1 an
 ) <tbl:z1>
 
 #figure(
-  image(figpath("fig16_cum_returns_z1.png"), width: 88%),
+  image(figpath("fig03_cum_returns_z1.png"), width: 88%),
   caption: [Cumulative returns at $z^star = plus.minus 1$ (equal ex-post vol; visuals only).],
 ) <fig:cum-z1>
 
@@ -301,7 +300,7 @@ absolute returns for the cointegration book, but the filter retains a clear risk
 ) <tbl:z2>
 
 #figure(
-  image(figpath("fig17_cum_returns_z2.png"), width: 88%),
+  image(figpath("fig04_cum_returns_z2.png"), width: 88%),
   caption: [Cumulative returns at $z^star = plus.minus 2$ (equal ex-post vol; visuals only).],
 ) <fig:cum-z2>
 
@@ -329,7 +328,7 @@ Sharpe and related ratios, with much smaller unlevered drawdowns.
 ) <tbl:z3>
 
 #figure(
-  image(figpath("fig18_cum_returns_z3.png"), width: 88%),
+  image(figpath("fig05_cum_returns_z3.png"), width: 88%),
   caption: [Cumulative returns at $z^star = plus.minus 3$ (equal ex-post vol; visuals only).],
 ) <fig:cum-z3>
 
