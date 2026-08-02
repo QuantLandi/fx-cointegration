@@ -38,7 +38,7 @@ metrics/portfolio tables.
 
 ## Data
 
-Daily Yahoo Finance FX spots, 2007-01-01 to 2024-01-01, seven USD crosses
+Daily Yahoo Finance FX spots, 2007-01-01 to 2025-12-31, seven USD crosses
 (AUD, CAD, CHF, EUR, GBP, JPY, NZD), all quoted as XXXUSD.
 
 ## Method (sketch)

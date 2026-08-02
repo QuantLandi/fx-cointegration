@@ -39,7 +39,7 @@
   )
 
   #v(0.4em)
-  #text(size: 10pt)[November 14, 2024]
+  #text(size: 10pt)[August 2026]
 
   #v(0.3em)
   #text(size: 9pt)[
@@ -57,7 +57,7 @@ Pairs trading exploits pricing differentials between related assets. A cointegra
 pairs strategy selects pairs that share a statistically significant long-run relationship, so that
 short-term divergences are more plausibly mean-reverting. This paper studies whether that
 filter improves risk-adjusted performance in the foreign-exchange market. Using daily spot
-prices for the seven most liquid USD crosses over 2007–2024, we compare a simple always-trade
+prices for the seven most liquid USD crosses over 2007–2025, we compare a simple always-trade
 pairs rule with an Engle–Granger cointegration screen on rolling 257/21-day train/test windows,
 across z-score entry thresholds $plus.minus 1$, $plus.minus 2$, and $plus.minus 3$. Charging a
 2~bp round-trip cost on position changes, the unlevered cointegration portfolio still
@@ -136,8 +136,8 @@ equilibrium with clearer economic content and fewer spurious linkages.
 == Data
 
 We use daily adjusted closes for EUR/USD, GBP/USD, USD/JPY, USD/CHF, USD/CAD,
-AUD/USD, and NZD/USD from Yahoo Finance @yahoo2024, January 1, 2007 to January 1,
-2024. Quotes with USD as numerator are inverted so every series is XXXUSD
+AUD/USD, and NZD/USD from Yahoo Finance @yahoo2024, January 1, 2007 to December 31,
+2025. Quotes with USD as numerator are inverted so every series is XXXUSD
 (e.g.\ JPYUSD $= 1/"USDJPY"$) @poundsterlinglive2022. Analysis uses log prices.
 
 Prices are processed in rolling blocks: a training window of $n = 257$ days (about one year)
@@ -232,9 +232,9 @@ figures are visual aids only.
     table.hline(),
     [z-score], [Equal-vol scale $L$], [Ann.\ vol EG (%)], [Ann.\ vol simple (%)],
     table.hline(stroke: 0.5pt),
-    [$plus.minus 1$], [4.44], [0.92], [4.10],
-    [$plus.minus 2$], [4.74], [0.62], [2.94],
-    [$plus.minus 3$], [5.41], [0.40], [2.15],
+    [$plus.minus 1$], [4.50], [0.89], [4.02],
+    [$plus.minus 2$], [4.75], [0.60], [2.85],
+    [$plus.minus 3$], [5.39], [0.38], [2.06],
     table.hline(),
   ),
   caption: [Equal ex-post daily-vol scales used in cumulative-return figures only ($kappa = 2$~bp; replication sample).],
@@ -271,15 +271,15 @@ returns).
     table.hline(),
     [Metric], [Cointegration], [Simple],
     table.hline(stroke: 0.5pt),
-    [Annualized return (%)], [0.56], [$-$0.04],
-    [Annualized volatility (%)], [0.92], [4.10],
-    [Sharpe ratio], [0.61], [$-$0.01],
-    [Sortino ratio], [0.69], [$-$0.01],
-    [Calmar ratio], [0.23], [$-$0.00],
+    [Annualized return (%)], [0.49], [$-$0.17],
+    [Annualized volatility (%)], [0.89], [4.02],
+    [Sharpe ratio], [0.55], [$-$0.04],
+    [Sortino ratio], [0.63], [$-$0.05],
+    [Calmar ratio], [0.20], [$-$0.01],
     [Maximum drawdown (%)], [$-$2.48], [$-$15.89],
     table.hline(),
   ),
-  caption: [Unlevered performance at $z^star = plus.minus 1$ after $kappa = 2$~bp RT costs (windows 257/21, 21 unordered pairs). Frictionless Sharpes are 0.67 (EG) and 0.04 (simple).],
+  caption: [Unlevered performance at $z^star = plus.minus 1$ after $kappa = 2$~bp RT costs (windows 257/21, 21 unordered pairs, sample through 2025). Frictionless Sharpes are 0.62 (EG) and 0.01 (simple).],
 ) <tbl:z1>
 
 #figure(
@@ -306,11 +306,11 @@ after costs.
     table.hline(),
     [Metric], [Cointegration], [Simple],
     table.hline(stroke: 0.5pt),
-    [Annualized return (%)], [0.26], [0.16],
-    [Annualized volatility (%)], [0.62], [2.94],
-    [Sharpe ratio], [0.42], [0.06],
+    [Annualized return (%)], [0.25], [0.18],
+    [Annualized volatility (%)], [0.60], [2.85],
+    [Sharpe ratio], [0.41], [0.06],
     [Sortino ratio], [0.34], [0.06],
-    [Calmar ratio], [0.14], [0.01],
+    [Calmar ratio], [0.13], [0.01],
     [Maximum drawdown (%)], [$-$1.93], [$-$12.51],
     table.hline(),
   ),
@@ -334,11 +334,11 @@ Sharpe and related ratios after costs, with much smaller unlevered drawdowns.
     table.hline(),
     [Metric], [Cointegration], [Simple],
     table.hline(stroke: 0.5pt),
-    [Annualized return (%)], [0.19], [0.17],
-    [Annualized volatility (%)], [0.40], [2.15],
-    [Sharpe ratio], [0.47], [0.08],
-    [Sortino ratio], [0.25], [0.06],
-    [Calmar ratio], [0.22], [0.02],
+    [Annualized return (%)], [0.18], [0.21],
+    [Annualized volatility (%)], [0.38], [2.06],
+    [Sharpe ratio], [0.48], [0.10],
+    [Sortino ratio], [0.25], [0.07],
+    [Calmar ratio], [0.21], [0.02],
     [Maximum drawdown (%)], [$-$0.86], [$-$9.27],
     table.hline(),
   ),
@@ -353,7 +353,7 @@ Sharpe and related ratios after costs, with much smaller unlevered drawdowns.
 @tbl:sharpe-sum and @tbl:mdd-sum summarize the threshold comparative at $kappa = 2$.
 @tbl:cost-sens shows that raising $kappa$ compresses both Sharpes, but the EG advantage
 remains positive through 5~bp at every threshold; at $plus.minus 1$ the simple book is already
-near zero at 1~bp and negative thereafter.
+near zero without costs and negative once $kappa >= 1$.
 
 #figure(
   table(
@@ -364,9 +364,9 @@ near zero at 1~bp and negative thereafter.
     table.hline(),
     [z-score], [Cointegration Sharpe], [Simple Sharpe],
     table.hline(stroke: 0.5pt),
-    [$plus.minus 1$], [0.61], [$-$0.01],
-    [$plus.minus 2$], [0.42], [0.06],
-    [$plus.minus 3$], [0.47], [0.08],
+    [$plus.minus 1$], [0.55], [$-$0.04],
+    [$plus.minus 2$], [0.41], [0.06],
+    [$plus.minus 3$], [0.48], [0.10],
     table.hline(),
   ),
   caption: [Unlevered Sharpe ratios across thresholds after $kappa = 2$~bp RT costs.],
@@ -398,18 +398,18 @@ near zero at 1~bp and negative thereafter.
     table.hline(),
     [z-score], [$kappa$ (bp)], [EG Sharpe], [Simple Sharpe],
     table.hline(stroke: 0.5pt),
-    [$plus.minus 1$], [0], [0.67], [0.04],
-    [], [1], [0.64], [0.02],
-    [], [2], [0.61], [$-$0.01],
-    [], [5], [0.52], [$-$0.08],
-    [$plus.minus 2$], [0], [0.46], [0.10],
-    [], [1], [0.44], [0.08],
-    [], [2], [0.42], [0.06],
-    [], [5], [0.36], [$-$0.01],
-    [$plus.minus 3$], [0], [0.49], [0.10],
-    [], [1], [0.48], [0.09],
-    [], [2], [0.47], [0.08],
-    [], [5], [0.42], [0.04],
+    [$plus.minus 1$], [0], [0.62], [0.01],
+    [], [1], [0.58], [$-$0.02],
+    [], [2], [0.55], [$-$0.04],
+    [], [5], [0.45], [$-$0.12],
+    [$plus.minus 2$], [0], [0.45], [0.11],
+    [], [1], [0.43], [0.08],
+    [], [2], [0.41], [0.06],
+    [], [5], [0.35], [$-$0.00],
+    [$plus.minus 3$], [0], [0.50], [0.13],
+    [], [1], [0.49], [0.11],
+    [], [2], [0.48], [0.10],
+    [], [5], [0.43], [0.06],
     table.hline(),
   ),
   caption: [Unlevered Sharpe sensitivity to round-trip cost $kappa$ (bp of pair notional).],
@@ -417,7 +417,7 @@ near zero at 1~bp and negative thereafter.
 
 @tbl:target10 reports the same portfolios after ex-post scaling to 10% annualized
 volatility ($kappa = 2$). At matched vol, cointegration’s higher Sharpe translates into higher
-scaled annualized return (e.g.\ 6.11% vs $-$0.09% at $plus.minus 1$). Scaled maximum drawdowns are
+scaled annualized return (e.g.\ 5.52% vs $-$0.43% at $plus.minus 1$). Scaled maximum drawdowns are
 large for both books — especially cointegration, which requires substantial leverage to
 reach 10% vol from a low unlevered base — so Calmar need not preserve the unlevered ranking.
 We therefore treat @tbl:target10 as a magnitude aid, not a replacement for the unlevered
@@ -432,12 +432,12 @@ metrics.
     table.hline(),
     [z], [Strategy], [Scale $L$], [Ann.\ ret.\ (%)], [Sharpe], [Calmar], [MDD (%)],
     table.hline(stroke: 0.5pt),
-    [$plus.minus 1$], [Cointegration], [10.82], [6.11], [0.61], [0.15], [$-$41.1],
-    [], [Simple], [2.44], [$-$0.09], [$-$0.01], [$-$0.00], [$-$34.4],
-    [$plus.minus 2$], [Cointegration], [16.12], [4.23], [0.42], [0.10], [$-$41.9],
-    [], [Simple], [3.40], [0.56], [0.06], [0.02], [$-$36.6],
-    [$plus.minus 3$], [Cointegration], [25.11], [4.66], [0.47], [0.12], [$-$39.1],
-    [], [Simple], [4.64], [0.77], [0.08], [0.02], [$-$36.5],
+    [$plus.minus 1$], [Cointegration], [11.21], [5.52], [0.55], [0.13], [$-$43.8],
+    [], [Simple], [2.49], [$-$0.43], [$-$0.04], [$-$0.01], [$-$35.0],
+    [$plus.minus 2$], [Cointegration], [16.69], [4.11], [0.41], [0.09], [$-$43.9],
+    [], [Simple], [3.51], [0.62], [0.06], [0.02], [$-$37.5],
+    [$plus.minus 3$], [Cointegration], [26.11], [4.76], [0.48], [0.11], [$-$41.6],
+    [], [Simple], [4.84], [1.01], [0.10], [0.03], [$-$37.7],
     table.hline(),
   ),
   caption: [Companion metrics at 10% target annualized volatility after $kappa = 2$~bp (ex-post $L = 0.10 \/ hat(sigma)$). Ann.\ volatility is 10% by construction; Sharpe matches the unlevered net table.],

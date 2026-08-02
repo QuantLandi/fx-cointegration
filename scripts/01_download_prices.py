@@ -21,7 +21,7 @@ TICKERS = (
     "NZDUSD=X",
 )
 START = "2007-01-01"
-END = "2024-01-01"
+END = "2026-01-01"  # exclusive end → last calendar day of 2025
 
 # Invert so every series is quoted as XXXUSD (matches original notebooks)
 INVERT = {
