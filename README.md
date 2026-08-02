@@ -1,6 +1,8 @@
 # FX cointegration pairs trading
 
-Reproducible pipeline for Paper 1 (cointegration-based FX pairs trading).
+Replication code for Lemishko, Landi & Caicedo-Llano (2024),
+*Cointegration-Based Strategies in Forex Pairs Trading*
+([SSRN](https://ssrn.com/abstract=4771108)).
 
 ## Setup
 
