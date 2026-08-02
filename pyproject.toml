@@ -14,3 +14,8 @@ dependencies = [
     "statsmodels>=0.14.6",
     "yfinance>=0.2",
 ]
+
+[dependency-groups]
+dev = [
+    "pymupdf>=1.28.0",
+]

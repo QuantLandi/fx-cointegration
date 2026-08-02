@@ -1,4 +1,4 @@
-"""Build JAE paper Tables 1–6 from EG and simple pair panels.
+"""Build paper portfolio tables: unlevered metrics + equal-vol plot series.
 
 Requires:
   uv run python scripts/02_backtest.py --clear-panels
@@ -10,7 +10,6 @@ Requires:
 from __future__ import annotations
 
 import importlib.util
-import json
 from pathlib import Path
 
 import numpy as np
@@ -27,10 +26,11 @@ METRICS_SIMPLE = SIMPLE_DIR / "metrics.csv"
 PAPER_DIR = OUTPUT_DIR / "paper"
 TABLES_DIR = PAPER_DIR / "tables"
 PORTFOLIO_DIR = PAPER_DIR / "portfolio"
-TARGETS_PATH = ROOT / "local" / "targets_jae.json"
 
 Z_THRESHOLDS = (1.0, 2.0, 3.0)
 N_PAIRS = 42
+# Companion table only: scale each strategy to this ex-post ann. vol (fraction).
+TARGET_ANN_VOL = 0.10
 
 
 def _load_backtest():
@@ -58,7 +58,7 @@ def list_pair_dirs(panels_root: Path) -> list[Path]:
 
 
 def load_portfolio_returns(panels_root: Path, z: float) -> pd.Series:
-    """Sum pair strategy returns / 42 (paper standardized portfolio)."""
+    """Sum pair strategy returns / N_PAIRS (standardized portfolio)."""
     col = z_col(z)
     series: list[pd.Series] = []
     for pair_dir in list_pair_dirs(panels_root):
@@ -84,47 +84,21 @@ def metrics_row(rets: pd.Series, metrics_from_returns) -> dict[str, float]:
     }
 
 
-def leverage_for_equal_mdd(
-    eg: pd.Series,
-    target_mdd: float,
-    metrics_from_returns,
-    *,
-    lo: float = 0.01,
-    hi: float = 50.0,
-    tol: float = 1e-6,
-    max_iter: int = 60,
-) -> float:
-    """Find scalar L such that |MDD(eg * L)| matches |target_mdd| (fraction).
-
-    Needed because max DD on ``exp(cumsum)-1`` does not scale linearly with L.
-    """
-    target = abs(target_mdd)
-    if target == 0.0:
+def equal_vol_scale(eg: pd.Series, simple: pd.Series) -> float:
+    """Scalar L so daily vol(eg * L) matches daily vol(simple). Visuals only."""
+    s_eg = float(eg.std(ddof=0))
+    s_simple = float(simple.std(ddof=0))
+    if s_eg == 0.0:
         return 1.0
+    return s_simple / s_eg
 
-    def mdd_abs(level: float) -> float:
-        return abs(metrics_from_returns(eg * level)["max_drawdown"])
 
-    # Expand upper bound if needed
-    for _ in range(20):
-        if mdd_abs(hi) >= target:
-            break
-        hi *= 2.0
-    else:
-        return hi
-
-    best = hi
-    for _ in range(max_iter):
-        mid = 0.5 * (lo + hi)
-        m = mdd_abs(mid)
-        best = mid
-        if abs(m - target) <= tol:
-            return mid
-        if m < target:
-            lo = mid
-        else:
-            hi = mid
-    return best
+def target_vol_scale(rets: pd.Series, target_ann_vol: float, metrics_from_returns) -> float:
+    """Ex-post L such that ann. vol(rets * L) ≈ target_ann_vol."""
+    vol = metrics_from_returns(rets)["ann_volatility"]
+    if vol == 0.0:
+        return 1.0
+    return target_ann_vol / vol
 
 
 def refresh_pair_metrics(bt) -> None:
@@ -177,45 +151,53 @@ def main() -> None:
 
     refresh_pair_metrics(bt)
 
-    table1_rows: list[dict] = []
+    scale_rows: list[dict] = []
     tables_24_rows: list[dict] = []
-    paper_lev = {}
-    if TARGETS_PATH.exists():
-        targets = json.loads(TARGETS_PATH.read_text(encoding="utf-8"))
-        paper_lev = {
-            float(k): float(v) for k, v in targets["table1_leverage_paper"].items()
-        }
+    target_vol_rows: list[dict] = []
 
     for z in Z_THRESHOLDS:
         eg = load_portfolio_returns(PANELS_EG, z)
         simple = load_portfolio_returns(PANELS_SIMPLE, z)
-        # Align calendars
         idx = eg.index.union(simple.index).sort_values()
         eg = eg.reindex(idx).fillna(0.0)
         simple = simple.reindex(idx).fillna(0.0)
 
-        eg_unlev = metrics_row(eg, bt.metrics_from_returns)
+        eg_m = metrics_row(eg, bt.metrics_from_returns)
         simple_m = metrics_row(simple, bt.metrics_from_returns)
-        simple_mdd_frac = simple_m["max_drawdown_pct"] / 100.0
-        leverage = leverage_for_equal_mdd(
-            eg, simple_mdd_frac, bt.metrics_from_returns
-        )
-        eg_lev_rets = eg * leverage
-        eg_m = metrics_row(eg_lev_rets, bt.metrics_from_returns)
+        vol_scale = equal_vol_scale(eg, simple)
+        eg_equalvol = eg * vol_scale
 
-        table1_rows.append(
+        for side, rets, m_unlev in (
+            ("eg", eg, eg_m),
+            ("simple", simple, simple_m),
+        ):
+            lev = target_vol_scale(rets, TARGET_ANN_VOL, bt.metrics_from_returns)
+            m_tgt = metrics_row(rets * lev, bt.metrics_from_returns)
+            target_vol_rows.append(
+                {
+                    "z_threshold": z,
+                    "strategy": side,
+                    "target_ann_vol_pct": TARGET_ANN_VOL * 100.0,
+                    "scale": lev,
+                    **m_tgt,
+                    "sharpe_unlevered": m_unlev["sharpe"],
+                }
+            )
+
+        scale_rows.append(
             {
                 "z_threshold": z,
-                "leverage_computed": leverage,
-                "leverage_paper": paper_lev.get(z, float("nan")),
-                "mdd_eg_unlevered_pct": eg_unlev["max_drawdown_pct"],
+                "equal_vol_scale": vol_scale,
+                "ann_vol_eg_pct": eg_m["ann_volatility_pct"],
+                "ann_vol_simple_pct": simple_m["ann_volatility_pct"],
+                "mdd_eg_pct": eg_m["max_drawdown_pct"],
                 "mdd_simple_pct": simple_m["max_drawdown_pct"],
             }
         )
         for side, m in (("eg", eg_m), ("simple", simple_m)):
             tables_24_rows.append({"z_threshold": z, "strategy": side, **m})
 
-        eg_lev_rets.to_csv(
+        eg.to_csv(
             PORTFOLIO_DIR / f"returns_eg_z{z:g}.csv",
             header=["return"],
             index_label="date",
@@ -225,22 +207,40 @@ def main() -> None:
             header=["return"],
             index_label="date",
         )
-        wealth = pd.DataFrame(
+        # Unlevered wealth (for diagnostics)
+        wealth_unlev = pd.DataFrame(
             {
-                "eg_levered": np.exp(eg_lev_rets.cumsum()) - 1.0,
+                "eg": np.exp(eg.cumsum()) - 1.0,
                 "simple": np.exp(simple.cumsum()) - 1.0,
             }
         )
-        wealth.to_csv(
-            PORTFOLIO_DIR / f"cum_return_z{z:g}.csv", index_label="date"
+        wealth_unlev.to_csv(
+            PORTFOLIO_DIR / f"cum_return_unlevered_z{z:g}.csv",
+            index_label="date",
+        )
+        # Equal ex-post vol wealth (default plot series)
+        wealth_eqvol = pd.DataFrame(
+            {
+                "eg_equalvol": np.exp(eg_equalvol.cumsum()) - 1.0,
+                "simple": np.exp(simple.cumsum()) - 1.0,
+            }
+        )
+        wealth_eqvol.to_csv(
+            PORTFOLIO_DIR / f"cum_return_z{z:g}.csv",
+            index_label="date",
+        )
+        wealth_eqvol.to_csv(
+            PORTFOLIO_DIR / f"cum_return_equalvol_z{z:g}.csv",
+            index_label="date",
         )
 
-    table1 = pd.DataFrame(table1_rows)
+    scale = pd.DataFrame(scale_rows)
     tables_24 = pd.DataFrame(tables_24_rows)
-    table1.to_csv(TABLES_DIR / "table1_leverage.csv", index=False)
+    target_vol = pd.DataFrame(target_vol_rows)
+    scale.to_csv(TABLES_DIR / "equal_vol_scale.csv", index=False)
     tables_24.to_csv(TABLES_DIR / "tables_2_4_by_z.csv", index=False)
+    target_vol.to_csv(TABLES_DIR / "tables_target_vol_10pct.csv", index=False)
 
-    # Table 5 / 6 convenience extracts
     wide = tables_24.pivot(index="z_threshold", columns="strategy")
     t5 = pd.DataFrame(
         {
@@ -261,10 +261,12 @@ def main() -> None:
 
     print(f"Saved tables under {TABLES_DIR.relative_to(ROOT)}/")
     print(f"Saved portfolio series under {PORTFOLIO_DIR.relative_to(ROOT)}/")
-    print("\nTable 1 (leverage):")
-    print(table1.to_string(index=False))
-    print("\nTables 2–4 (equal-MDD):")
+    print("\nEqual-vol plot scales (visuals only):")
+    print(scale.to_string(index=False))
+    print("\nTables 2–4 (unlevered):")
     print(tables_24.to_string(index=False))
+    print("\nCompanion table (10% target ann. vol, ex-post):")
+    print(target_vol.to_string(index=False))
 
 
 if __name__ == "__main__":
