@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.venv/
+
+# Regenerated results (frozen prices in data/ stay in git)
+outputs/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
