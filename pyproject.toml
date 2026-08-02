@@ -10,5 +10,6 @@ dependencies = [
     "numpy>=2.0",
     "pandas>=2.2",
     "pyarrow>=16.0",
+    "statsmodels>=0.14.6",
     "yfinance>=0.2",
 ]

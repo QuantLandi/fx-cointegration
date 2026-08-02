@@ -10,6 +10,9 @@ wheels/
 # Regenerated results (frozen prices in data/ stay in git)
 outputs/
 
+# Local-only sanity checks (not published)
+local/
+
 # OS / editor
 .DS_Store
 Thumbs.db

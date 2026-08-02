@@ -7,7 +7,7 @@ from pathlib import Path
 import pandas as pd
 import yfinance as yf
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "data"
 PRICES_PATH = DATA_DIR / "fx_prices.parquet"
 
@@ -81,7 +81,9 @@ def download_prices() -> pd.DataFrame:
 
 def load_prices(path: Path = PRICES_PATH) -> pd.DataFrame:
     if not path.exists():
-        raise FileNotFoundError(f"Missing {path}. Run: uv run python download_prices.py")
+        raise FileNotFoundError(
+            f"Missing {path}. Run: uv run python scripts/01_download_prices.py"
+        )
     prices = pd.read_parquet(path)
     prices.index = pd.to_datetime(prices.index)
     return prices
