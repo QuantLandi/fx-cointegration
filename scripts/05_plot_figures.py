@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -152,6 +153,12 @@ def fig3_5_cum_returns() -> None:
             f"Figure {fig_n}: Cumulative returns at z=±{z:g} (equal ex-post vol)"
         )
         ax.set_ylabel("Cumulative return")
+        ax.xaxis.set_major_locator(mdates.YearLocator())
+        ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))
+        ax.tick_params(axis="x", labelrotation=45)
+        for label in ax.get_xticklabels():
+            label.set_horizontalalignment("right")
+        ax.grid(True, which="major", linestyle="--", linewidth=0.5, alpha=0.6)
         ax.legend()
         ax.axhline(0, color="black", linewidth=0.5)
         fig.tight_layout()
