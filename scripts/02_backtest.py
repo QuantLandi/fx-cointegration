@@ -1,17 +1,24 @@
 """Rolling Engle-Granger FX pairs backtest (Paper 1 subset).
 
-Default: 42 directed pairs, train=257, test=21, z in {1, 2, 3}.
+42 directed pairs, train=257, test=21, z in {1, 2, 3}.
 
   uv run python scripts/02_backtest.py
   uv run python scripts/02_backtest.py --clear-panels
-  uv run python scripts/02_backtest.py --full   # exploratory window grid
+
+Panel layout (per pair):
+  outputs/panels/aud_cad/
+    prices.csv, returns.csv, spread.csv, zscore.csv
+    signal.csv, strategy_return.csv, strategy_cum_return.csv
+  (z-dependent files use columns z_1, z_2, z_3)
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
 import warnings
+from datetime import datetime, timezone
 from itertools import permutations
 from pathlib import Path
 
@@ -39,45 +46,21 @@ CURRENCIES = (
 PAPER_WINDOW = (257, 21)
 Z_THRESHOLDS = (1.0, 2.0, 3.0)
 
-# Used only with --full
-WINDOWS_FULL = (
-    (63, 1),
-    (63, 5),
-    (63, 21),
-    (128, 1),
-    (128, 5),
-    (128, 21),
-    (128, 63),
-    (257, 1),
-    (257, 5),
-    (257, 21),
-    (257, 63),
-    (257, 128),
-)
 
-PANEL_COLUMNS = (
-    "price_1",
-    "price_2",
-    "return_1",
-    "return_2",
-    "spread",
-    "zscore",
-    "signal",
-    "strategy_return",
-    "strategy_cum_return",
-)
+def engle_granger_hedge(y: pd.Series, x: pd.Series) -> float | None:
+    """Engle–Granger screen at 5%; return OLS hedge ratio or None.
 
-
-def engle_granger_test(y: pd.Series, x: pd.Series) -> bool:
-    """ADF 5%: both legs non-stationary, OLS residual stationary."""
+    Uses statsmodels ``adfuller`` defaults: regression='c', autolag='AIC'
+    (max lag chosen by AIC). Both legs must fail to reject a unit root
+    (p > 0.05); the OLS residual must reject (p <= 0.05). The returned
+    coefficient is the slope on x from OLS of y on (const, x).
+    """
     if adfuller(y)[1] <= 0.05 or adfuller(x)[1] <= 0.05:
-        return False
-    resid = sm.OLS(y, sm.add_constant(x)).fit().resid
-    return bool(adfuller(resid)[1] <= 0.05)
-
-
-def hedge_ratio(y: pd.Series, x: pd.Series) -> float:
-    return float(sm.OLS(y, sm.add_constant(x)).fit().params.iloc[1])
+        return None
+    fit = sm.OLS(y, sm.add_constant(x)).fit()
+    if adfuller(fit.resid)[1] > 0.05:
+        return None
+    return float(fit.params.iloc[1])
 
 
 def load_pair(prices: pd.DataFrame, a1: str, a2: str) -> pd.DataFrame:
@@ -103,42 +86,58 @@ def compute_zscores(
     data: pd.DataFrame,
     train_window: int,
     test_window: int,
-) -> pd.DataFrame:
-    """Rolling EG screen; write OOS spread/z-score on test windows that pass."""
+) -> tuple[pd.DataFrame, dict[str, int]]:
+    """Rolling EG screen; write OOS spread/z-score on test windows that pass.
+
+    Days outside a passing OOS block keep NaN spread/zscore (not traded).
+    Returns (panel, window_stats) where stats counts screened windows and skips.
+    """
     out = data.copy()
-    spread = pd.Series(0.0, index=out.index)
-    zscore = pd.Series(0.0, index=out.index)
+    spread = pd.Series(np.nan, index=out.index, dtype=float)
+    zscore = pd.Series(np.nan, index=out.index, dtype=float)
+    stats = {"windows": 0, "passed": 0, "skipped_eg": 0, "skipped_std": 0}
 
     for i in range(train_window, len(out) - test_window + 1, test_window):
         train = out.iloc[i - train_window : i]
         test = out.iloc[i : i + test_window]
+        stats["windows"] += 1
 
-        if not engle_granger_test(train["log_1"], train["log_2"]):
+        coef = engle_granger_hedge(train["log_1"], train["log_2"])
+        if coef is None:
+            stats["skipped_eg"] += 1
             continue
 
-        coef = hedge_ratio(train["log_1"], train["log_2"])
         train_spread = train["log_1"] - coef * train["log_2"]
         std = float(train_spread.std())
         if std == 0.0 or np.isnan(std):
+            stats["skipped_std"] += 1
             continue
 
         mean = float(train_spread.mean())
         test_spread = test["log_1"] - coef * test["log_2"]
         spread.loc[test.index] = test_spread
         zscore.loc[test.index] = (test_spread - mean) / std
+        stats["passed"] += 1
 
     out["spread"] = spread
     out["zscore"] = zscore
-    return out
+    return out, stats
 
 
 def apply_threshold(data: pd.DataFrame, threshold: float) -> pd.DataFrame:
-    """Z-score rule with a 2-day lag."""
+    """Z-score rule with a 2-day lag. NaN z (inactive window) -> flat.
+
+    PnL is equal-notional: signal * (r1 - r2). The EG hedge ratio is used
+    only to form the spread/z-score, not to size the second leg.
+    """
     out = data.copy()
-    z = out["zscore"].to_numpy()
-    signal = np.zeros(len(out), dtype=int)
-    signal[z > threshold] = -1
-    signal[z < -threshold] = 1
+    z = out["zscore"].to_numpy(dtype=float)
+    # NaN comparisons are False, so inactive days stay flat (same as |z| < threshold).
+    signal = np.select(
+        [z > threshold, z < -threshold],
+        [-1, 1],
+        default=0,
+    ).astype(int)
     out["signal"] = pd.Series(signal, index=out.index).shift(2).fillna(0).astype(int)
     out["strategy_return"] = (
         out["signal"] * (out["return_1"] - out["return_2"])
@@ -155,6 +154,12 @@ def summarize(
     test_window: int,
     threshold: float,
 ) -> dict:
+    """Summary metrics for one config.
+
+    Sharpe uses all calendar days (flat days as 0 return), so vol is diluted
+    when the strategy is often out of the market. ``trades`` counts days with
+    nonzero signal, not round-trips.
+    """
     rets = result["strategy_return"]
     ann_ret = float(rets.mean() * 252)
     ann_vol = float(rets.std() * np.sqrt(252))
@@ -183,79 +188,108 @@ def leg_code(symbol: str) -> str:
     return symbol[:-3].lower()
 
 
-def panel_path(
-    a1: str,
-    a2: str,
-    train_window: int,
-    test_window: int,
-    z: float,
-    *,
-    include_window_in_name: bool,
-) -> Path:
-    folder = PANELS_DIR / f"z_{int(z)}"
-    folder.mkdir(parents=True, exist_ok=True)
-    stem = f"{leg_code(a1)}_{leg_code(a2)}"
-    if include_window_in_name:
-        stem = f"{stem}_{train_window}_{test_window}"
-    return folder / f"{stem}.csv"
+def z_col(threshold: float) -> str:
+    """Column name for a z-threshold (z_1, z_2, z_1.5, …)."""
+    return f"z_{threshold:g}"
 
 
-def run_grid(
-    prices: pd.DataFrame,
-    windows: list[tuple[int, int]],
-    thresholds: list[float],
-) -> pd.DataFrame:
+def pair_dir(a1: str, a2: str) -> Path:
+    path = PANELS_DIR / f"{leg_code(a1)}_{leg_code(a2)}"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def save_pair_panels(
+    scored: pd.DataFrame,
+    by_z: dict[float, pd.DataFrame],
+    out_dir: Path,
+) -> None:
+    """Write one-concept-per-file panels; z-dependent series as columns z_1, z_2, …"""
+    scored[["price_1", "price_2"]].to_csv(out_dir / "prices.csv", index_label="date")
+    scored[["return_1", "return_2"]].to_csv(out_dir / "returns.csv", index_label="date")
+    scored[["spread"]].to_csv(out_dir / "spread.csv", index_label="date")
+    scored[["zscore"]].to_csv(out_dir / "zscore.csv", index_label="date")
+
+    signal = pd.DataFrame({z_col(z): df["signal"] for z, df in by_z.items()})
+    strategy_return = pd.DataFrame(
+        {z_col(z): df["strategy_return"] for z, df in by_z.items()}
+    )
+    strategy_cum_return = pd.DataFrame(
+        {z_col(z): df["strategy_cum_return"] for z, df in by_z.items()}
+    )
+    signal.to_csv(out_dir / "signal.csv", index_label="date")
+    strategy_return.to_csv(out_dir / "strategy_return.csv", index_label="date")
+    strategy_cum_return.to_csv(out_dir / "strategy_cum_return.csv", index_label="date")
+
+
+def run_grid(prices: pd.DataFrame) -> pd.DataFrame:
+    train_window, test_window = PAPER_WINDOW
     pairs = directed_pairs()
     rows: list[dict] = []
-    total = len(pairs) * len(windows)
-    include_window_in_name = len(windows) > 1
+    totals = {"windows": 0, "passed": 0, "skipped_eg": 0, "skipped_std": 0}
 
-    for done, ((a1, a2), (train_window, test_window)) in enumerate(
-        ((pair, window) for pair in pairs for window in windows),
-        start=1,
-    ):
+    for done, (a1, a2) in enumerate(pairs, start=1):
         print(
-            f"[{done}/{total}] {a1}/{a2} train={train_window} test={test_window}",
+            f"[{done}/{len(pairs)}] {a1}/{a2} "
+            f"train={train_window} test={test_window}",
             flush=True,
         )
-        scored = compute_zscores(load_pair(prices, a1, a2), train_window, test_window)
-        for z in thresholds:
+        scored, stats = compute_zscores(
+            load_pair(prices, a1, a2), train_window, test_window
+        )
+        for key in totals:
+            totals[key] += stats[key]
+        by_z: dict[float, pd.DataFrame] = {}
+        for z in Z_THRESHOLDS:
             result = apply_threshold(scored, z)
+            by_z[z] = result
             rows.append(summarize(result, a1, a2, train_window, test_window, z))
-            result.loc[:, PANEL_COLUMNS].to_csv(
-                panel_path(
-                    a1,
-                    a2,
-                    train_window,
-                    test_window,
-                    z,
-                    include_window_in_name=include_window_in_name,
-                ),
-                index_label="date",
-            )
+        save_pair_panels(scored, by_z, pair_dir(a1, a2))
 
+    print(
+        "Window screen: "
+        f"{totals['passed']}/{totals['windows']} passed EG, "
+        f"{totals['skipped_eg']} failed EG, "
+        f"{totals['skipped_std']} skipped (zero/NaN train std)",
+        flush=True,
+    )
     return pd.DataFrame(rows)
+
+
+def write_metrics_provenance(prices: pd.DataFrame, metrics_path: Path) -> Path:
+    """Sidecar JSON recording which price freeze and constants produced metrics."""
+    meta = {
+        "generated_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "metrics_file": metrics_path.relative_to(ROOT).as_posix(),
+        "prices_file": PRICES_PATH.relative_to(ROOT).as_posix(),
+        "prices_mtime_utc": datetime.fromtimestamp(
+            PRICES_PATH.stat().st_mtime, tz=timezone.utc
+        ).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "prices_rows": int(len(prices)),
+        "prices_start": str(prices.index.min().date()),
+        "prices_end": str(prices.index.max().date()),
+        "currencies": list(CURRENCIES),
+        "train_window": PAPER_WINDOW[0],
+        "test_window": PAPER_WINDOW[1],
+        "z_thresholds": list(Z_THRESHOLDS),
+        "n_pairs": len(directed_pairs()),
+        "n_configs": len(directed_pairs()) * len(Z_THRESHOLDS),
+        "signal_lag_days": 2,
+        "pnl": "equal_notional_r1_minus_r2",
+    }
+    meta_path = metrics_path.with_suffix(".meta.json")
+    meta_path.write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
+    return meta_path
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--full",
-        action="store_true",
-        help="Exploratory grid over all notebook windows (default is paper 257/21).",
-    )
     parser.add_argument(
         "--clear-panels",
         action="store_true",
         help="Delete outputs/panels before writing.",
     )
     args = parser.parse_args()
-
-    if args.full:
-        label, windows, out_name = "full", list(WINDOWS_FULL), "metrics_full.csv"
-    else:
-        label, windows, out_name = "paper", [PAPER_WINDOW], "metrics_paper.csv"
-    thresholds = list(Z_THRESHOLDS)
 
     if not PRICES_PATH.exists():
         raise FileNotFoundError(
@@ -269,22 +303,28 @@ def main() -> None:
     prices = pd.read_parquet(PRICES_PATH)
     prices.index = pd.to_datetime(prices.index)
 
-    n_configs = len(directed_pairs()) * len(windows) * len(thresholds)
+    n_pairs = len(directed_pairs())
+    n_configs = n_pairs * len(Z_THRESHOLDS)
     print(
-        f"Running {label}: {len(directed_pairs())} pairs x "
-        f"{len(windows)} windows x {len(thresholds)} z = {n_configs} configs"
+        f"Running paper grid: {n_pairs} pairs x "
+        f"window {PAPER_WINDOW[0]}/{PAPER_WINDOW[1]} x "
+        f"{len(Z_THRESHOLDS)} z = {n_configs} configs"
     )
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    # OLS/ADF can emit CollinearityWarning / RuntimeWarning on singular windows;
+    # those cases are counted via skipped_eg / skipped_std in run_grid.
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=CollinearityWarning)
         warnings.simplefilter("ignore", category=RuntimeWarning)
-        metrics = run_grid(prices, windows, thresholds)
+        metrics = run_grid(prices)
 
-    out_path = OUTPUT_DIR / out_name
+    out_path = OUTPUT_DIR / "metrics_paper.csv"
     metrics.to_csv(out_path, index=False)
+    meta_path = write_metrics_provenance(prices, out_path)
     print(f"Saved metrics: {out_path.relative_to(ROOT)} ({len(metrics)} rows)")
-    print(f"Saved panels:  {n_configs} files under {PANELS_DIR.relative_to(ROOT)}/")
+    print(f"Saved provenance: {meta_path.relative_to(ROOT)}")
+    print(f"Saved panels:  {n_pairs} pair folders under {PANELS_DIR.relative_to(ROOT)}/")
     print(metrics.sort_values("sharpe", ascending=False).head(10).to_string(index=False))
 
 
