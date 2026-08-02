@@ -6,15 +6,25 @@ Replication code for Lemishko, Landi & Caicedo-Llano (2024),
 
 ## Setup
 
+Requires [uv](https://docs.astral.sh/uv/) and Python ≥ 3.12.
+
 ```bash
+git clone https://github.com/QuantLandi/fx-cointegration.git
 cd fx-cointegration
 uv sync
 ```
 
-## Pipeline
+Frozen prices are in `data/fx_prices.parquet`. Re-download only if you need a new freeze:
 
 ```bash
-uv run python scripts/01_download_prices.py         # freeze data/fx_prices.parquet
+uv run python scripts/01_download_prices.py
+```
+
+## Pipeline
+
+From the repo root:
+
+```bash
 uv run python scripts/02_backtest.py --clear-panels  # paper grid (257/21, z=1,2,3)
 ```
 
