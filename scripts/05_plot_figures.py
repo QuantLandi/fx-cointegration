@@ -44,6 +44,7 @@ LEG_LABEL = {
     "NZDUSD": "NZD",
 }
 Z_THRESHOLDS = (1.0, 2.0, 3.0)
+BASELINE_COST_BP = 2.0
 
 
 def savefig(fig: plt.Figure, name: str) -> None:
@@ -123,6 +124,8 @@ def fig2_sharpe_heatmap() -> None:
     if not METRICS_EG.exists():
         raise FileNotFoundError(f"Missing {METRICS_EG}; run 04_portfolio_tables.py")
     m = pd.read_csv(METRICS_EG)
+    if "cost_bp" in m.columns:
+        m = m[m["cost_bp"] == BASELINE_COST_BP]
     sub = m[m["z_threshold"] == 1.0].copy()
     sub["r"] = sub["currency_1"].map(LEG_LABEL)
     sub["c"] = sub["currency_2"].map(LEG_LABEL)
@@ -132,7 +135,7 @@ def fig2_sharpe_heatmap() -> None:
         mat.loc[row["r"], row["c"]] = float(row["sharpe"])
     _heatmap(
         mat,
-        "Figure 2: Sharpe",
+        f"Figure 2: Sharpe (κ = {BASELINE_COST_BP:g} bp RT)",
         "fig02_sharpe_heatmap.png",
         annotate=True,
         decimals=1,
@@ -150,7 +153,8 @@ def fig3_5_cum_returns() -> None:
         ax.plot(df.index, df[eg_col], label="Cointegration-based (equal vol)")
         ax.plot(df.index, df["simple"], label="Simple pairs")
         ax.set_title(
-            f"Figure {fig_n}: Cumulative returns at z=±{z:g} (equal ex-post vol)"
+            f"Figure {fig_n}: Cumulative returns at z=±{z:g} "
+            f"(equal ex-post vol, κ = {BASELINE_COST_BP:g} bp RT)"
         )
         ax.set_ylabel("Cumulative return")
         ax.xaxis.set_major_locator(mdates.YearLocator())

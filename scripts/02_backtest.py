@@ -45,6 +45,9 @@ CURRENCIES = (
 
 PAPER_WINDOW = (257, 21)
 Z_THRESHOLDS = (1.0, 2.0, 3.0)
+# Round-trip bp of pair notional; charge (κ/1e4)*|Δs|/2 per day.
+COST_BPS = (0.0, 1.0, 2.0, 5.0)
+BASELINE_COST_BP = 2.0
 
 
 def engle_granger_detail(
@@ -170,7 +173,11 @@ def compute_zscores(
 
 
 def apply_threshold(data: pd.DataFrame, threshold: float) -> pd.DataFrame:
-    """Z-score rule with a 2-day lag. NaN z (inactive window) -> flat."""
+    """Z-score rule with a 2-day lag. NaN z (inactive window) -> flat.
+
+    Panel ``strategy_return`` is *gross* (zero transaction cost). Net returns
+    for a cost grid are applied later via ``apply_transaction_costs``.
+    """
     out = data.copy()
     z = out["zscore"].to_numpy(dtype=float)
     signal = np.select(
@@ -184,6 +191,28 @@ def apply_threshold(data: pd.DataFrame, threshold: float) -> pd.DataFrame:
     ).fillna(0.0)
     out["strategy_cum_return"] = np.exp(out["strategy_return"].cumsum()) - 1.0
     return out
+
+
+def apply_transaction_costs(
+    gross: pd.Series,
+    signal: pd.Series,
+    cost_rt_bp: float,
+) -> pd.Series:
+    """Subtract round-trip costs charged on |Δsignal|/2.
+
+    ``cost_rt_bp`` is basis points of pair notional for a full open→close
+    round trip (κ). Opening or closing (|Δs|=1) costs κ/2 bp; a flip (|Δs|=2)
+    costs a full κ bp.
+    """
+    gross = gross.fillna(0.0)
+    if cost_rt_bp == 0.0:
+        return gross
+    sig = signal.fillna(0).astype(float)
+    turnover = sig.diff().abs()
+    if len(turnover):
+        turnover.iloc[0] = float(abs(sig.iloc[0]))
+    cost = (cost_rt_bp / 1e4) * (turnover / 2.0)
+    return gross - cost.fillna(0.0)
 
 
 def metrics_from_returns(rets: pd.Series) -> dict[str, float]:
@@ -223,14 +252,20 @@ def summarize(
     train_window: int,
     test_window: int,
     threshold: float,
+    *,
+    cost_bp: float = 0.0,
 ) -> dict:
-    m = metrics_from_returns(result["strategy_return"])
+    rets = apply_transaction_costs(
+        result["strategy_return"], result["signal"], cost_bp
+    )
+    m = metrics_from_returns(rets)
     return {
         "currency_1": a1,
         "currency_2": a2,
         "train_window": train_window,
         "test_window": test_window,
         "z_threshold": threshold,
+        "cost_bp": cost_bp,
         **m,
         "trades": int((result["signal"] != 0).sum()),
     }
@@ -307,7 +342,18 @@ def run_grid(
         for z in Z_THRESHOLDS:
             result = apply_threshold(scored, z)
             by_z[z] = result
-            rows.append(summarize(result, a1, a2, train_window, test_window, z))
+            for cost_bp in COST_BPS:
+                rows.append(
+                    summarize(
+                        result,
+                        a1,
+                        a2,
+                        train_window,
+                        test_window,
+                        z,
+                        cost_bp=cost_bp,
+                    )
+                )
         save_pair_panels(scored, by_z, pair_dir(a1, a2, panels_root))
 
     if require_coint:
@@ -349,11 +395,17 @@ def write_metrics_provenance(
         "train_window": PAPER_WINDOW[0],
         "test_window": PAPER_WINDOW[1],
         "z_thresholds": list(Z_THRESHOLDS),
+        "cost_bps": list(COST_BPS),
+        "baseline_cost_bp": BASELINE_COST_BP,
+        "cost_model": "rt_bp_on_abs_dsignal_over_2",
         "n_pairs": len(undirected_pairs()),
-        "n_configs": len(undirected_pairs()) * len(Z_THRESHOLDS),
+        "n_configs": (
+            len(undirected_pairs()) * len(Z_THRESHOLDS) * len(COST_BPS)
+        ),
         "pair_universe": "undirected_alphabetical",
         "signal_lag_days": 2,
         "pnl": "equal_notional_r1_minus_r2",
+        "panels_strategy_return": "gross_zero_cost",
     }
     meta_path = metrics_path.with_suffix(".meta.json")
     meta_path.write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
@@ -393,12 +445,12 @@ def main() -> None:
     prices.index = pd.to_datetime(prices.index)
 
     n_pairs = len(undirected_pairs())
-    n_configs = n_pairs * len(Z_THRESHOLDS)
+    n_configs = n_pairs * len(Z_THRESHOLDS) * len(COST_BPS)
     label = "EG" if require_coint else "simple"
     print(
         f"Running {label} grid: {n_pairs} undirected pairs x "
         f"window {PAPER_WINDOW[0]}/{PAPER_WINDOW[1]} x "
-        f"{len(Z_THRESHOLDS)} z = {n_configs} configs"
+        f"{len(Z_THRESHOLDS)} z x {len(COST_BPS)} cost = {n_configs} configs"
     )
 
     strategy_root.mkdir(parents=True, exist_ok=True)

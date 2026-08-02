@@ -26,6 +26,7 @@ KEYS = (
     "train_window",
     "test_window",
     "z_threshold",
+    "cost_bp",
 )
 
 
@@ -76,7 +77,7 @@ def main() -> None:
     COMPARE_DIR.mkdir(parents=True, exist_ok=True)
     out.to_csv(OUT_PATH, index=False)
 
-    by_z = out.groupby("z_threshold", sort=True).agg(
+    by_z = out.groupby(["z_threshold", "cost_bp"], sort=True).agg(
         n=("delta_sharpe", "size"),
         mean_delta_sharpe=("delta_sharpe", "mean"),
         eg_win_share=("eg_wins", "mean"),
@@ -94,6 +95,7 @@ def main() -> None:
                 "currency_1",
                 "currency_2",
                 "z_threshold",
+                "cost_bp",
                 "sharpe_eg",
                 "sharpe_simple",
                 "delta_sharpe",

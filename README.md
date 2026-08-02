@@ -54,15 +54,19 @@ Daily Yahoo Finance FX spots, 2007-01-01 to 2024-01-01, seven USD crosses
    Annualized Sharpe uses **all calendar days** (flat days as 0), so volatility
    is diluted when often out of market. Metrics `trades` = days with nonzero
    signal, not round-trips.
-5. **Paper portfolio:** sum the 21 pair daily returns, divide by 21. Main tables
+5. **Transaction costs:** round-trip κ bp of pair notional charged as
+   `(κ/1e4)·|Δsignal|/2` (open/close = κ/2 each; flip = κ). Grid
+   `{0, 1, 2, 5}` bp; headline **κ = 2**. Panels store gross returns; costs are
+   applied when building metrics and portfolio tables.
+6. **Paper portfolio:** sum the 21 pair daily returns, divide by 21. Main tables
    are **unlevered**. A companion table scales each strategy ex-post to **10%
    annualized vol** so return/MDD levels are comparable (Sharpe unchanged).
    Cumulative-return figures scale the EG path to **equal ex-post daily vol** vs
    simple (visuals only). Sortino uses the std of strictly negative daily returns;
    Calmar = ann return / |max DD|.
 
-**Paper subset:** train=257, test=21, z* ∈ {1, 2, 3}, 21 undirected pairs.
-Simple benchmark: `--simple` (no EG gate).
+**Paper subset:** train=257, test=21, z* ∈ {1, 2, 3}, 21 undirected pairs,
+cost κ ∈ {0, 1, 2, 5} bp (baseline 2). Simple benchmark: `--simple` (no EG gate).
 
 ## Outputs
 

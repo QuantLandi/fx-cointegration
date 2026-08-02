@@ -59,9 +59,11 @@ short-term divergences are more plausibly mean-reverting. This paper studies whe
 filter improves risk-adjusted performance in the foreign-exchange market. Using daily spot
 prices for the seven most liquid USD crosses over 2007–2024, we compare a simple always-trade
 pairs rule with an Engle–Granger cointegration screen on rolling 257/21-day train/test windows,
-across z-score entry thresholds $plus.minus 1$, $plus.minus 2$, and $plus.minus 3$. On unlevered portfolios, the
-cointegration-based strategy delivers higher Sharpe, Sortino, and Calmar ratios than the
-simple benchmark at every threshold, with the largest Sharpe advantage at $plus.minus 1$.
+across z-score entry thresholds $plus.minus 1$, $plus.minus 2$, and $plus.minus 3$. Charging a
+2~bp round-trip cost on position changes, the unlevered cointegration portfolio still
+delivers higher Sharpe, Sortino, and Calmar ratios than the simple benchmark at every
+threshold, with the largest Sharpe advantage at $plus.minus 1$. The ranking is unchanged
+relative to frictionless (zero-cost) results and survives a grid up to 5~bp.
 
 #v(0.4em)
 #text(size: 10pt)[
@@ -185,9 +187,20 @@ $hat(epsilon)_t = log P^(1)_t - beta log P^(2)_t$ (intercept cancels in the z-sc
 
 Enter a long spread when $Z_t < -z^star$ and a short spread when $Z_t > z^star$, for
 thresholds $z^star in {1,2,3}$. Signals are lagged two days to allow for execution delay:
-$ R^"strat"_t = "Signal"_(t-2) times (r^(1)_t - r^(2)_t) $ <eq:pnl>
+$ R^"gross"_t = "Signal"_(t-2) times (r^(1)_t - r^(2)_t) $ <eq:pnl>
 with equal notional on each leg (not $beta$-hedged PnL). Flat days enter the Sharpe
 denominator as zeros.
+
+*Transaction costs.* Let $s_t in {-1,0,1}$ denote the lagged signal. We charge a
+round-trip cost of $kappa$ basis points of pair notional on position changes,
+$ "cost"_t = (kappa \/ 10^4) times |s_t - s_(t-1)| \/ 2 $,
+so that opening or closing (|Δ$s$|=1) costs $kappa\/2$~bp and a long–short flip
+(|Δ$s$|=2) costs a full $kappa$~bp. Net returns are
+$ R^"net"_t = R^"gross"_t - "cost"_t $.
+We report the grid $kappa in {0,1,2,5}$, with *headline* results at $kappa = 2$~bp
+(a conventional all-in estimate for liquid G10 spot). Zero cost recovers the
+frictionless horse race; 5~bp is a conservative upper bound. Swap/rollover is left as
+a caveat (short test windows and frequent flats keep overnight exposure limited).
 
 == Strategy implementation and portfolio construction
 
@@ -198,12 +211,13 @@ only for the z-score (alphabetical OLS hedge, no cointegration gate).
 above accepts cointegration on the preceding training window; otherwise the pair is flat.
 
 Pair returns are summed and divided by 21 to form a standardized portfolio. Main tables
-report these series *unlevered*. Because the cointegration book is often flat, its unlevered
-volatility is much smaller than the always-trade benchmark, so raw return and drawdown
-levels are hard to compare by eye. As a *companion* presentation only, we also rescale each
-strategy ex post by $L = sigma^star \/ hat(sigma)$ to a common annualized volatility
-target $sigma^star = 10%$ (@tbl:target10). We choose 10% as a round, conventional risk
-budget (neither fitted to the sample nor tied to either strategy’s realized vol). Sharpe and
+report these series *unlevered* and, unless noted, *after* $kappa = 2$~bp costs. Because the
+cointegration book is often flat, its unlevered volatility is much smaller than the
+always-trade benchmark, so raw return and drawdown levels are hard to compare by eye. As a
+*companion* presentation only, we also rescale each strategy ex post by
+$L = sigma^star \/ hat(sigma)$ to a common annualized volatility target
+$sigma^star = 10%$ (@tbl:target10). We choose 10% as a round, conventional risk budget
+(neither fitted to the sample nor tied to either strategy’s realized vol). Sharpe and
 Sortino are invariant to this scale; return, maximum drawdown, and Calmar are not, because
 compounded drawdowns are nonlinear in $L$. Cumulative-return figures separately rescale the
 cointegration path so that *daily* volatilities match the simple path (@tbl:eqvol); those
@@ -223,7 +237,7 @@ figures are visual aids only.
     [$plus.minus 3$], [5.41], [0.40], [2.15],
     table.hline(),
   ),
-  caption: [Equal ex-post daily-vol scales used in cumulative-return figures only (replication sample).],
+  caption: [Equal ex-post daily-vol scales used in cumulative-return figures only ($kappa = 2$~bp; replication sample).],
 ) <tbl:eqvol>
 
 = Results
@@ -232,19 +246,21 @@ figures are visual aids only.
 
 Per-currency return paths and additional descriptive heatmaps are omitted for brevity.
 @fig:sharpe-hm shows pair-level annualized Sharpe ratios at the baseline threshold
-$z^star = 1$. Dispersion across unordered pairs is large; a few crosses (notably some
-GBP and JPY combinations in this sample) dominate the right tail of risk-adjusted
-pair performance.
+$z^star = 1$ after $kappa = 2$~bp costs. Dispersion across unordered pairs is large; a few
+crosses (notably some GBP and JPY combinations in this sample) dominate the right tail of
+risk-adjusted pair performance.
 
 #figure(
   image(figpath("fig02_sharpe_heatmap.png"), width: 72%),
-  caption: [Heatmap of annualized Sharpe ratios by unordered pair ($z^star = 1$, EG-filtered).],
+  caption: [Heatmap of annualized Sharpe ratios by unordered pair ($z^star = 1$, EG-filtered, $kappa = 2$~bp RT).],
 ) <fig:sharpe-hm>
 
 == Cointegration-based strategy versus simple pairs
 
-We compare *unlevered* portfolios at training/testing windows 257/21. @tbl:z1 and
-@fig:cum-z1 give the headline $z^star = 1$ results (figures use equal ex-post vol scaling).
+We compare *unlevered* portfolios at training/testing windows 257/21. Headline tables use
+$kappa = 2$~bp; @tbl:cost-sens reports Sharpe across the full cost grid. @tbl:z1 and
+@fig:cum-z1 give the $z^star = 1$ results (figures use equal ex-post vol scaling on net
+returns).
 
 #figure(
   table(
@@ -255,29 +271,31 @@ We compare *unlevered* portfolios at training/testing windows 257/21. @tbl:z1 an
     table.hline(),
     [Metric], [Cointegration], [Simple],
     table.hline(stroke: 0.5pt),
-    [Annualized return (%)], [0.62], [0.16],
+    [Annualized return (%)], [0.56], [$-$0.04],
     [Annualized volatility (%)], [0.92], [4.10],
-    [Sharpe ratio], [0.67], [0.04],
-    [Sortino ratio], [0.74], [0.04],
-    [Calmar ratio], [0.25], [0.01],
-    [Maximum drawdown (%)], [$-$2.45], [$-$15.66],
+    [Sharpe ratio], [0.61], [$-$0.01],
+    [Sortino ratio], [0.69], [$-$0.01],
+    [Calmar ratio], [0.23], [$-$0.00],
+    [Maximum drawdown (%)], [$-$2.48], [$-$15.89],
     table.hline(),
   ),
-  caption: [Unlevered performance at $z^star = plus.minus 1$, windows 257/21, 21 unordered pairs (replication).],
+  caption: [Unlevered performance at $z^star = plus.minus 1$ after $kappa = 2$~bp RT costs (windows 257/21, 21 unordered pairs). Frictionless Sharpes are 0.67 (EG) and 0.04 (simple).],
 ) <tbl:z1>
 
 #figure(
   image(figpath("fig03_cum_returns_z1.png"), width: 88%),
-  caption: [Cumulative returns at $z^star = plus.minus 1$ (equal ex-post vol; visuals only).],
+  caption: [Cumulative returns at $z^star = plus.minus 1$ (equal ex-post vol; $kappa = 2$~bp; visuals only).],
 ) <fig:cum-z1>
 
-Unlevered, cointegration earns higher annualized return than the always-trade rule at far
-lower volatility and drawdown, so Sharpe, Sortino, and Calmar are substantially higher.
-The equal-vol equity curve rises more steadily than the simple path, which suffers deeper
-early-sample drawdowns (notably around 2008 and 2011–12).
+Unlevered and after costs, cointegration still earns a positive annualized return at far
+lower volatility and drawdown than the always-trade rule, whose 2~bp haircut turns its
+already thin $z^star = 1$ edge slightly negative. The equal-vol equity curve rises more
+steadily than the simple path, which suffers deeper early-sample drawdowns (notably around
+2008 and 2011–12).
 
 Widening the entry band to $plus.minus 2$ (@tbl:z2, @fig:cum-z2) reduces trading intensity and
-absolute returns for the cointegration book, but the filter retains a clear risk-adjusted edge.
+absolute returns for the cointegration book, but the filter retains a clear risk-adjusted edge
+after costs.
 
 #figure(
   table(
@@ -288,24 +306,24 @@ absolute returns for the cointegration book, but the filter retains a clear risk
     table.hline(),
     [Metric], [Cointegration], [Simple],
     table.hline(stroke: 0.5pt),
-    [Annualized return (%)], [0.29], [0.28],
+    [Annualized return (%)], [0.26], [0.16],
     [Annualized volatility (%)], [0.62], [2.94],
-    [Sharpe ratio], [0.46], [0.10],
-    [Sortino ratio], [0.35], [0.09],
-    [Calmar ratio], [0.15], [0.02],
-    [Maximum drawdown (%)], [$-$1.93], [$-$12.39],
+    [Sharpe ratio], [0.42], [0.06],
+    [Sortino ratio], [0.34], [0.06],
+    [Calmar ratio], [0.14], [0.01],
+    [Maximum drawdown (%)], [$-$1.93], [$-$12.51],
     table.hline(),
   ),
-  caption: [Unlevered performance at $z^star = plus.minus 2$.],
+  caption: [Unlevered performance at $z^star = plus.minus 2$ after $kappa = 2$~bp RT costs.],
 ) <tbl:z2>
 
 #figure(
   image(figpath("fig04_cum_returns_z2.png"), width: 88%),
-  caption: [Cumulative returns at $z^star = plus.minus 2$ (equal ex-post vol; visuals only).],
+  caption: [Cumulative returns at $z^star = plus.minus 2$ (equal ex-post vol; $kappa = 2$~bp; visuals only).],
 ) <fig:cum-z2>
 
 At $plus.minus 3$ (@tbl:z3, @fig:cum-z3) both books trade less often; cointegration still leads on
-Sharpe and related ratios, with much smaller unlevered drawdowns.
+Sharpe and related ratios after costs, with much smaller unlevered drawdowns.
 
 #figure(
   table(
@@ -316,24 +334,26 @@ Sharpe and related ratios, with much smaller unlevered drawdowns.
     table.hline(),
     [Metric], [Cointegration], [Simple],
     table.hline(stroke: 0.5pt),
-    [Annualized return (%)], [0.20], [0.22],
+    [Annualized return (%)], [0.19], [0.17],
     [Annualized volatility (%)], [0.40], [2.15],
-    [Sharpe ratio], [0.49], [0.10],
-    [Sortino ratio], [0.23], [0.07],
-    [Calmar ratio], [0.23], [0.02],
-    [Maximum drawdown (%)], [$-$0.85], [$-$9.19],
+    [Sharpe ratio], [0.47], [0.08],
+    [Sortino ratio], [0.25], [0.06],
+    [Calmar ratio], [0.22], [0.02],
+    [Maximum drawdown (%)], [$-$0.86], [$-$9.27],
     table.hline(),
   ),
-  caption: [Unlevered performance at $z^star = plus.minus 3$.],
+  caption: [Unlevered performance at $z^star = plus.minus 3$ after $kappa = 2$~bp RT costs.],
 ) <tbl:z3>
 
 #figure(
   image(figpath("fig05_cum_returns_z3.png"), width: 88%),
-  caption: [Cumulative returns at $z^star = plus.minus 3$ (equal ex-post vol; visuals only).],
+  caption: [Cumulative returns at $z^star = plus.minus 3$ (equal ex-post vol; $kappa = 2$~bp; visuals only).],
 ) <fig:cum-z3>
 
-@tbl:sharpe-sum and @tbl:mdd-sum summarize the threshold comparative. The Sharpe advantage
-is largest at the tightest band; wider bands cut unlevered drawdowns for both strategies.
+@tbl:sharpe-sum and @tbl:mdd-sum summarize the threshold comparative at $kappa = 2$.
+@tbl:cost-sens shows that raising $kappa$ compresses both Sharpes, but the EG advantage
+remains positive through 5~bp at every threshold; at $plus.minus 1$ the simple book is already
+near zero at 1~bp and negative thereafter.
 
 #figure(
   table(
@@ -344,12 +364,12 @@ is largest at the tightest band; wider bands cut unlevered drawdowns for both st
     table.hline(),
     [z-score], [Cointegration Sharpe], [Simple Sharpe],
     table.hline(stroke: 0.5pt),
-    [$plus.minus 1$], [0.67], [0.04],
-    [$plus.minus 2$], [0.46], [0.10],
-    [$plus.minus 3$], [0.49], [0.10],
+    [$plus.minus 1$], [0.61], [$-$0.01],
+    [$plus.minus 2$], [0.42], [0.06],
+    [$plus.minus 3$], [0.47], [0.08],
     table.hline(),
   ),
-  caption: [Unlevered Sharpe ratios across thresholds.],
+  caption: [Unlevered Sharpe ratios across thresholds after $kappa = 2$~bp RT costs.],
 ) <tbl:sharpe-sum>
 
 #figure(
@@ -361,19 +381,45 @@ is largest at the tightest band; wider bands cut unlevered drawdowns for both st
     table.hline(),
     [z-score], [Cointegration MDD (%)], [Simple MDD (%)],
     table.hline(stroke: 0.5pt),
-    [$plus.minus 1$], [$-$2.45], [$-$15.66],
-    [$plus.minus 2$], [$-$1.93], [$-$12.39],
-    [$plus.minus 3$], [$-$0.85], [$-$9.19],
+    [$plus.minus 1$], [$-$2.48], [$-$15.89],
+    [$plus.minus 2$], [$-$1.93], [$-$12.51],
+    [$plus.minus 3$], [$-$0.86], [$-$9.27],
     table.hline(),
   ),
-  caption: [Unlevered maximum drawdowns by threshold.],
+  caption: [Unlevered maximum drawdowns by threshold after $kappa = 2$~bp RT costs.],
 ) <tbl:mdd-sum>
 
+#figure(
+  table(
+    columns: 4,
+    align: (left, right, right, right),
+    stroke: none,
+    inset: (x: 8pt, y: 5pt),
+    table.hline(),
+    [z-score], [$kappa$ (bp)], [EG Sharpe], [Simple Sharpe],
+    table.hline(stroke: 0.5pt),
+    [$plus.minus 1$], [0], [0.67], [0.04],
+    [], [1], [0.64], [0.02],
+    [], [2], [0.61], [$-$0.01],
+    [], [5], [0.52], [$-$0.08],
+    [$plus.minus 2$], [0], [0.46], [0.10],
+    [], [1], [0.44], [0.08],
+    [], [2], [0.42], [0.06],
+    [], [5], [0.36], [$-$0.01],
+    [$plus.minus 3$], [0], [0.49], [0.10],
+    [], [1], [0.48], [0.09],
+    [], [2], [0.47], [0.08],
+    [], [5], [0.42], [0.04],
+    table.hline(),
+  ),
+  caption: [Unlevered Sharpe sensitivity to round-trip cost $kappa$ (bp of pair notional).],
+) <tbl:cost-sens>
+
 @tbl:target10 reports the same portfolios after ex-post scaling to 10% annualized
-volatility. At matched vol, cointegration’s higher Sharpe translates into higher scaled
-annualized return (e.g.\ 6.73% vs 0.40% at $plus.minus 1$). Scaled maximum drawdowns are large
-for both books — especially cointegration, which requires substantial leverage to reach
-10% vol from a low unlevered base — so Calmar need not preserve the unlevered ranking.
+volatility ($kappa = 2$). At matched vol, cointegration’s higher Sharpe translates into higher
+scaled annualized return (e.g.\ 6.11% vs $-$0.09% at $plus.minus 1$). Scaled maximum drawdowns are
+large for both books — especially cointegration, which requires substantial leverage to
+reach 10% vol from a low unlevered base — so Calmar need not preserve the unlevered ranking.
 We therefore treat @tbl:target10 as a magnitude aid, not a replacement for the unlevered
 metrics.
 
@@ -386,15 +432,15 @@ metrics.
     table.hline(),
     [z], [Strategy], [Scale $L$], [Ann.\ ret.\ (%)], [Sharpe], [Calmar], [MDD (%)],
     table.hline(stroke: 0.5pt),
-    [$plus.minus 1$], [Cointegration], [10.82], [6.73], [0.67], [0.15], [$-$44.0],
-    [], [Simple], [2.44], [0.40], [0.04], [0.01], [$-$34.0],
-    [$plus.minus 2$], [Cointegration], [16.12], [4.64], [0.46], [0.11], [$-$42.6],
-    [], [Simple], [3.40], [0.97], [0.10], [0.03], [$-$36.3],
-    [$plus.minus 3$], [Cointegration], [25.10], [4.94], [0.49], [0.12], [$-$40.0],
-    [], [Simple], [4.64], [1.01], [0.10], [0.03], [$-$36.2],
+    [$plus.minus 1$], [Cointegration], [10.82], [6.11], [0.61], [0.15], [$-$41.1],
+    [], [Simple], [2.44], [$-$0.09], [$-$0.01], [$-$0.00], [$-$34.4],
+    [$plus.minus 2$], [Cointegration], [16.12], [4.23], [0.42], [0.10], [$-$41.9],
+    [], [Simple], [3.40], [0.56], [0.06], [0.02], [$-$36.6],
+    [$plus.minus 3$], [Cointegration], [25.11], [4.66], [0.47], [0.12], [$-$39.1],
+    [], [Simple], [4.64], [0.77], [0.08], [0.02], [$-$36.5],
     table.hline(),
   ),
-  caption: [Companion metrics at 10% target annualized volatility (ex-post $L = 0.10 \/ hat(sigma)$). Ann.\ volatility is 10% by construction; Sharpe matches the unlevered table.],
+  caption: [Companion metrics at 10% target annualized volatility after $kappa = 2$~bp (ex-post $L = 0.10 \/ hat(sigma)$). Ann.\ volatility is 10% by construction; Sharpe matches the unlevered net table.],
 ) <tbl:target10>
 
 = Conclusions and future research
@@ -402,13 +448,15 @@ metrics.
 This study asks whether an Engle–Granger cointegration filter improves FX pairs trading
 among seven liquid USD crosses. On rolling 257/21 windows and 21 unordered pairs, the
 *unlevered* cointegration portfolio outperforms the always-trade benchmark on Sharpe,
-Sortino, and Calmar at $z^star in {1,2,3}$, with the strongest Sharpe edge at $plus.minus 1$.
-A companion 10% target-vol table makes return magnitudes easier to compare while leaving
-Sharpe unchanged. Wider thresholds further reduce unlevered volatility and drawdowns but
-shrink the incremental Sharpe benefit of the filter.
+Sortino, and Calmar at $z^star in {1,2,3}$ after a 2~bp round-trip cost, with the strongest
+Sharpe edge at $plus.minus 1$. The ranking matches the frictionless case and remains positive
+through 5~bp. A companion 10% target-vol table makes return magnitudes easier to compare
+while leaving Sharpe unchanged. Wider thresholds further reduce unlevered volatility and
+drawdowns but shrink the incremental Sharpe benefit of the filter.
 
-Natural extensions include a broader grid of window lengths and thresholds; transaction
-costs (spread and rollover); stronger economic motivation from parity relationships; and
+Natural extensions include a broader grid of window lengths and thresholds; stronger
+economic motivation from parity relationships (PPP / interest-rate parity); accounting for
+cross-pair dependence when interpreting the 21-pair panel; overnight swap costs; and
 Johansen screens as robustness to the Engle–Granger design.
 
 #v(1em)
