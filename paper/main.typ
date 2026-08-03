@@ -76,14 +76,15 @@ filter improves risk-adjusted performance in the foreign-exchange market. Using 
 prices for the seven most liquid USD crosses over 2007–2025, we compare a simple always-trade
 pairs rule with an Engle–Granger cointegration screen on rolling 257/21-day train/test windows,
 across z-score entry thresholds $plus.minus 1$, $plus.minus 2$, and $plus.minus 3$. Charging a
-2~bp round-trip cost on position changes, the unlevered cointegration portfolio still
+stylized 2~bp round-trip cost on position changes, the unlevered cointegration portfolio still
 delivers higher Sharpe, Sortino, and Calmar ratios than the simple benchmark at every
 threshold, with the largest Sharpe advantage at $plus.minus 1$. The ranking is unchanged
 relative to frictionless (zero-cost) results and survives a grid up to 5~bp.
 
 #v(0.4em)
 #text(size: 10pt)[
-  *Keywords:* Cointegration, Pairs Trading, Mean Reversion, Forex, Currency Markets
+  *Keywords:* Cointegration, Pairs Trading, Mean Reversion, Forex, Currency Markets \
+  *JEL classification:* C58, F31, G11, G15
 ]
 
 #v(0.8em)
@@ -242,7 +243,7 @@ so that opening or closing (|Δ$s$|=1) costs $kappa\/2$~bp and a long–short fl
 (|Δ$s$|=2) costs a full $kappa$~bp. Net returns are
 $ R^"net"_t = R^"gross"_t - "cost"_t $.
 We report the grid $kappa in {0,1,2,5}$, with *headline* results at $kappa = 2$~bp
-(a conventional all-in estimate for liquid G10 spot). Zero cost recovers the
+(a stylized all-in estimate for liquid G10 spot, not a full bid–ask plus rollover model). Zero cost recovers the
 frictionless horse race; 5~bp is a conservative upper bound. Swap/rollover is left as
 a caveat (short test windows and frequent flats keep overnight exposure limited).
 
