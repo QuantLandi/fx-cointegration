@@ -1,0 +1,46 @@
+cff-version: 1.2.0
+message: >-
+  If you use this replication package, please cite it using the metadata below.
+  Prefer the working-paper / SSRN entry for the manuscript; the Typst draft in
+  this repository (sample through 2025-12-31) supersedes older SSRN PDF numbers
+  if they diverge.
+type: software
+title: "FX cointegration pairs trading — replication package"
+abstract: >-
+  Replication code and Typst manuscript for cointegration-based FX pairs trading
+  on seven liquid USD crosses (2007–2025), comparing an Engle–Granger screen to
+  an always-trade benchmark under stylized round-trip costs.
+authors:
+  - family-names: Lemishko
+    given-names: Tetiana
+  - family-names: Landi
+    given-names: Alexandre
+    email: alexandre1.landi@skema.edu
+    affiliation: SKEMA Business School
+  - family-names: Caicedo-Llano
+    given-names: Juliana
+repository-code: "https://github.com/QuantLandi/fx-cointegration"
+url: "https://github.com/QuantLandi/fx-cointegration"
+license: MIT
+license-url: "https://github.com/QuantLandi/fx-cointegration/blob/main/LICENSE"
+date-released: "2026-08-03"
+version: "0.1.0"
+contact:
+  - family-names: Landi
+    given-names: Alexandre
+    email: alexandre1.landi@skema.edu
+preferred-citation:
+  type: article
+  title: "Cointegration-Based Strategies in Forex Pairs Trading"
+  authors:
+    - family-names: Lemishko
+      given-names: Tetiana
+    - family-names: Landi
+      given-names: Alexandre
+    - family-names: Caicedo-Llano
+      given-names: Juliana
+  year: 2024
+  url: "https://ssrn.com/abstract=4771108"
+  notes: >-
+    Working paper on SSRN. In-repo Typst rewrite (August 2026) and frozen sample
+    through 2025-12-31 are authoritative for current reported numbers.

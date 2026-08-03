@@ -3,7 +3,7 @@ name = "fx-cointegration"
 version = "0.1.0"
 description = "Reproducible FX cointegration pairs-trading pipeline (Paper 1)"
 authors = [
-    { name = "Alexandre Landi", email = "alexandre.landi@skema.edu" }
+    { name = "Alexandre Landi", email = "alexandre1.landi@skema.edu" }
 ]
 requires-python = ">=3.12"
 dependencies = [

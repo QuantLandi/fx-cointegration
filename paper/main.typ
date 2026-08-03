@@ -284,6 +284,14 @@ figures are visual aids only.
   caption: [Equal ex-post daily-vol scales used in cumulative-return figures only ($kappa = 2$~bp; replication sample).],
 ) <tbl:eqvol>
 
+The 21 unordered pairs are not independent experiments. Every leg is a USD cross, and many
+pairs share a second currency, so pair returns comove under common dollar and risk shocks.
+Pair-level Sharpe ratios and “EG wins” counts are therefore descriptive of the
+cross-section, not twenty-one separate hypothesis tests. Our primary evidence is the
+*portfolio* comparison of Engle–Granger versus always-trade rules (equal weight $1 \/ 21$),
+which already aggregates those dependent legs. We do not apply multiple-testing adjustments
+or clustered inference to the pair panel.
+
 = Results
 
 == Descriptive analysis
@@ -504,6 +512,12 @@ accounting for cross-pair dependence when interpreting the 21-pair panel; overni
 costs; and Johansen screens as further robustness.
 
 #v(1em)
+*Data and code availability.* Replication code, the frozen Yahoo-derived daily FX
+sample (`data/fx_prices.parquet`), and this manuscript are available at
+#link("https://github.com/QuantLandi/fx-cointegration"). Code, scripts, and data
+are released under the MIT License; Typst source, PDF, figures, and bibliography
+under `paper/` under CC BY 4.0. Pipeline instructions are in the repository README.
+
 *Conflict of interest.* The authors declare no potential conflict of interest.
 
 #bibliography("refs.bib", title: "References")

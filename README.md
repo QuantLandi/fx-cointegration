@@ -1,8 +1,14 @@
 # FX cointegration pairs trading
 
-Replication code for Lemishko, Landi & Caicedo-Llano (2024),
-*Cointegration-Based Strategies in Forex Pairs Trading*
-([SSRN](https://ssrn.com/abstract=4771108)).
+Replication code and Typst manuscript for Lemishko, Landi & Caicedo-Llano,
+*Cointegration-Based Strategies in Forex Pairs Trading* (August 2026 rewrite;
+frozen sample through 2025-12-31). Working-paper landing page:
+[SSRN](https://ssrn.com/abstract=4771108). If the SSRN PDF lags this repository,
+treat `paper/main.typ` / `paper/main.pdf` and the frozen parquet here as
+authoritative for current numbers.
+
+Please cite this repository via GitHub **Cite this repository** /
+[`CITATION.cff`](CITATION.cff).
 
 ## Setup
 
@@ -35,6 +41,10 @@ uv run python scripts/05_plot_figures.py                     # → outputs/paper
 `04_portfolio_tables.py` also refreshes pair `metrics.csv` from existing panels
 (including the `{0,1,2,5}` bp cost grid), so you need not re-run EG just for
 metrics/portfolio tables.
+
+**Runtime:** full `02`–`05` on a laptop is typically on the order of **tens of
+minutes** (Engle–Granger screens dominate; `--simple` is faster). Steps `03`–`05`
+are quick once panels exist.
 
 ## Data
 
@@ -95,4 +105,22 @@ flat days are 0. Net returns apply `(κ/1e4)·|Δsignal|/2` in metrics and `04`.
 `outputs/` and `local/` are gitignored. Optional local checks (JAE table
 tolerances, notebook spot checks) live under `local/`.
 
-Typst draft: `paper/main.typ` (figures via `paper/figures` → `outputs/paper/figures`).
+Manuscript: `paper/main.typ` (compiled PDF: `paper/main.pdf`; figures via
+`paper/figures`, regenerated from `outputs/paper/figures`).
+
+## License
+
+- **Code, scripts, `pyproject.toml`, `uv.lock`, and `data/`:** [MIT](LICENSE)
+- **Manuscript assets under `paper/`** (Typst source, PDF, figures, bibliography):
+  [CC BY 4.0](paper/LICENSE)
+
+The frozen parquet in `data/` is a derived replication sample built from Yahoo
+Finance FX spots; underlying Yahoo quotes remain subject to Yahoo’s terms of use.
+
+## GitHub About (manual)
+
+Paste into the repository **About** panel on GitHub:
+
+- **Description:** `Replication code and Typst manuscript for FX Engle–Granger pairs trading (7 USD crosses, 2007–2025)`
+- **Topics:** `forex`, `pairs-trading`, `cointegration`, `replication`, `engle-granger`, `typst`
+- **Website (optional):** `https://ssrn.com/abstract=4771108`
