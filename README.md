@@ -116,11 +116,3 @@ Manuscript: `paper/main.typ` (compiled PDF: `paper/main.pdf`; figures via
 
 The frozen parquet in `data/` is a derived replication sample built from Yahoo
 Finance FX spots; underlying Yahoo quotes remain subject to Yahoo’s terms of use.
-
-## GitHub About (manual)
-
-Paste into the repository **About** panel on GitHub:
-
-- **Description:** `Replication code and Typst manuscript for FX Engle–Granger pairs trading (7 USD crosses, 2007–2025)`
-- **Topics:** `forex`, `pairs-trading`, `cointegration`, `replication`, `engle-granger`, `typst`
-- **Website (optional):** `https://ssrn.com/abstract=4771108`
