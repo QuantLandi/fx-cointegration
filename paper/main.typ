@@ -34,13 +34,25 @@
     columns: (1fr, 1fr, 1fr),
     gutter: 1em,
     author-block(
-      [Tetiana Lemishko],
+      [Tetiana Lemishko#super[\*]],
       [Balanced Research, France\
       #text(size: 8.5pt)[(affiliation at the time of writing)]],
     ),
-    author-block([Alexandre Landi], [SKEMA Business School, France]),
-    author-block([Juliana Caicedo-Llano], [Regent's University London, UK]),
+    author-block(
+      [Alexandre Landi#super[\*]],
+      [SKEMA Business School, France],
+    ),
+    author-block(
+      [Juliana Caicedo-Llano],
+      [University of Évry Paris-Saclay, France\
+      Regent's University London, UK],
+    ),
   )
+
+  #v(0.35em)
+  #text(size: 8.5pt)[
+    #super[\*] These authors contributed equally to this work (co-first authors).
+  ]
 
   #v(0.4em)
   #text(size: 10pt)[August 2026]
