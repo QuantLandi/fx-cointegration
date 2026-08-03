@@ -168,17 +168,17 @@ although real exchange rates mean-revert only slowly, the associated “PPP puzz
 implies that related nominal rates are not free to wander independently forever
 @rogoff1996. Covered and uncovered interest-rate parity connect spot rates, forwards, and
 interest differentials; even when uncovered interest parity fails as a short-horizon
-forecast (@fama1984), exchange rates remain asset prices tightly tied to macro
-fundamentals (@engelwest2005). Together with a shared USD numeraire and deep G10
+forecast @fama1984, exchange rates remain asset prices tightly tied to macro
+fundamentals @engelwest2005. Together with a shared USD numeraire and deep G10
 liquidity, these parity and macro links make *long-run co-movement*—and therefore
 cointegration-based relative-value trading—economically plausible in this universe
-(@dunis2011).
+@dunis2011.
 
 Importantly, we do *not* estimate PPP baskets, trade real-exchange-rate gaps, or form
 positions from UIP residuals. The trading object remains a bivariate log-price spread among
 unordered XXXUSD majors, gated by the Engle–Granger screen described below. Parity
 relations motivate *where* we look; the pre-committed EG rule determines *when* we trade.
-Parity-based screens are left as a natural extension.
+At this stage, parity-based screens are left as a natural extension.
 
 == Cointegration analysis
 
