@@ -33,8 +33,12 @@
   #grid(
     columns: (1fr, 1fr, 1fr),
     gutter: 1em,
-    author-block([Tetiana Lemishko], [Balanced Research, Antibes, France]),
-    author-block([Alexandre Landi], [IBM, Paris, France]),
+    author-block(
+      [Tetiana Lemishko],
+      [Balanced Research, France\
+      #text(size: 8.5pt)[(affiliation at the time of writing)]],
+    ),
+    author-block([Alexandre Landi], [SKEMA Business School, France]),
     author-block([Juliana Caicedo-Llano], [Regent's University London, UK]),
   )
 
@@ -43,8 +47,8 @@
 
   #v(0.3em)
   #text(size: 9pt)[
-    Correspondence: Tetiana Lemishko —
-    #link("mailto:tetiana.lemishko@balanced-research.com")
+    Correspondence: Alexandre Landi —
+    #link("mailto:alexandre1.landi@skema.edu")
   ]
 ]
 
