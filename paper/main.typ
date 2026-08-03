@@ -85,12 +85,18 @@ equilibrium are statistically constrained and therefore more credible as trading
 @engle1987 @vidyamurthy2004.
 
 Despite a large equity literature, cointegration-based pairs trading remains comparatively
-thin in FX. This paper fills that gap for major currencies. We compare (i) a *simple* pairs
-strategy that always trades the synthetic spread on every out-of-sample block with (ii) a
-*cointegration-based* strategy that trades only when Engle–Granger cointegration is detected
-on the preceding training window. The universe comprises all unordered pairs among seven
-USD-denominated majors ($C(7,2) = 21$ pairs). Performance is evaluated with annualized
-return and volatility, Sharpe, Sortino, and Calmar ratios, and maximum drawdown
+thin in FX. This paper fills that gap for major currencies. The seven most liquid USD
+crosses are natural candidates for relative-value analysis: they share a common dollar
+numeraire, are tightly linked by trade and capital flows, and are disciplined by parity
+relations such as purchasing-power parity and interest-rate parity
+@rogoff1996 @fama1984 @engelwest2005. Those links make long-run co-movement among majors
+*plausible*; they do not, by themselves, deliver a trading rule. We therefore keep the
+empirical design statistical: we compare (i) a *simple* pairs strategy that always trades
+the synthetic spread on every out-of-sample block with (ii) a *cointegration-based*
+strategy that trades only when Engle–Granger cointegration is detected on the preceding
+training window. The universe comprises all unordered pairs among seven USD-denominated
+majors ($C(7,2) = 21$ pairs). Performance is evaluated with annualized return and
+volatility, Sharpe, Sortino, and Calmar ratios, and maximum drawdown
 @sharpe1966 @sortino1991 @young1991 on *unlevered* portfolios. Cumulative-return figures
 scale the cointegration path to equal ex-post volatility for visual comparison only.
 
@@ -129,7 +135,9 @@ after costs; our contribution is the analogous horse race in major FX. Ranking/f
 approaches @huck2009 @huck2010 are complementary but outside our design.
 
 Relative to short-horizon correlation filters, cointegration anchors trades in a long-run
-equilibrium with clearer economic content and fewer spurious linkages.
+equilibrium. In FX that equilibrium has a natural economic reading via parity and common
+macro drivers; we spell out that motivation—and what we do *not* estimate—in the next
+section.
 
 = Methodology
 
@@ -151,6 +159,26 @@ The simple strategy skips (i) but still uses the training moments.
   image(figpath("fig01_train_test_schematic.png"), width: 85%),
   caption: [Iterative training and testing windows over the sample.],
 ) <fig:schematic>
+
+== Economic motivation
+
+Why should an Engle–Granger screen be more than a statistical filter among 21 correlated
+USD crosses? Purchasing-power parity (PPP) links national price levels to exchange rates;
+although real exchange rates mean-revert only slowly, the associated “PPP puzzle” still
+implies that related nominal rates are not free to wander independently forever
+@rogoff1996. Covered and uncovered interest-rate parity connect spot rates, forwards, and
+interest differentials; even when uncovered interest parity fails as a short-horizon
+forecast (@fama1984), exchange rates remain asset prices tightly tied to macro
+fundamentals (@engelwest2005). Together with a shared USD numeraire and deep G10
+liquidity, these parity and macro links make *long-run co-movement*—and therefore
+cointegration-based relative-value trading—economically plausible in this universe
+(@dunis2011).
+
+Importantly, we do *not* estimate PPP baskets, trade real-exchange-rate gaps, or form
+positions from UIP residuals. The trading object remains a bivariate log-price spread among
+unordered XXXUSD majors, gated by the Engle–Granger screen described below. Parity
+relations motivate *where* we look; the pre-committed EG rule determines *when* we trade.
+Parity-based screens are left as a natural extension.
 
 == Cointegration analysis
 
@@ -454,10 +482,10 @@ through 5~bp. A companion 10% target-vol table makes return magnitudes easier to
 while leaving Sharpe unchanged. Wider thresholds further reduce unlevered volatility and
 drawdowns but shrink the incremental Sharpe benefit of the filter.
 
-Natural extensions include a broader grid of window lengths and thresholds; stronger
-economic motivation from parity relationships (PPP / interest-rate parity); accounting for
-cross-pair dependence when interpreting the 21-pair panel; overnight swap costs; and
-Johansen screens as robustness to the Engle–Granger design.
+Natural extensions include a broader grid of window lengths and thresholds; parity-based
+screens (PPP or UIP residuals) as alternatives or robustness checks to Engle–Granger;
+accounting for cross-pair dependence when interpreting the 21-pair panel; overnight swap
+costs; and Johansen screens as further robustness.
 
 #v(1em)
 *Conflict of interest.* The authors declare no potential conflict of interest.
