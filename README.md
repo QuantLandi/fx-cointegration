@@ -36,14 +36,15 @@ uv run python scripts/02_backtest.py --simple --clear-panels  # → outputs/simp
 uv run python scripts/03_compare_strategies.py               # → outputs/compare/
 uv run python scripts/04_portfolio_tables.py                 # → outputs/paper/tables|portfolio
 uv run python scripts/05_plot_figures.py                     # → outputs/paper/figures/
+uv run python scripts/06_per_trade_1pct_vol.py --target-vol 0.03  # companion 3% vol per live pair
 ```
 
 `04_portfolio_tables.py` also refreshes pair `metrics.csv` from existing panels
 (including the `{0,1,2,5}` bp cost grid), so you need not re-run EG just for
 metrics/portfolio tables.
 
-**Runtime:** full `02`–`05` on a laptop is typically on the order of **tens of
-minutes** (Engle–Granger screens dominate; `--simple` is faster). Steps `03`–`05`
+**Runtime:** full `02`–`06` on a laptop is typically on the order of **tens of
+minutes** (Engle–Granger screens dominate; `--simple` is faster). Steps `03`–`06`
 are quick once panels exist.
 
 ## Data
@@ -70,11 +71,13 @@ Daily Yahoo Finance FX spots, 2007-01-01 to 2025-12-31, seven USD crosses
    `{0, 1, 2, 5}` bp; headline **κ = 2**. Panels store gross returns; costs are
    applied when building metrics and portfolio tables.
 6. **Paper portfolio:** sum the 21 pair daily returns, divide by 21. Main tables
-   are **unlevered**. A companion table scales each strategy ex-post to **10%
-   annualized vol** so return/MDD levels are comparable (Sharpe unchanged).
-   Cumulative-return figures scale the EG path to **equal ex-post daily vol** vs
-   simple (visuals only). Sortino uses the std of strictly negative daily returns;
-   Calmar = ann return / |max DD|.
+   are **unlevered** and report **invested fraction** (mean live pairs / 21) and
+   **active days** (share of dates with at least one live pair) from `signal.csv`.
+   A companion table sizes **each live pair** to **3% annualized vol** from
+   train-window std of the spread return (same *L* for EG and simple; book =
+   **sum** of pair PnLs, not 1/21). Cumulative-return figures scale the EG path
+   to **equal ex-post daily vol** vs simple (visuals only). Sortino uses the std
+   of strictly negative daily returns; Calmar = ann return / |max DD|.
 
 **Paper subset:** train=257, test=21, z* ∈ {1, 2, 3}, 21 undirected pairs,
 cost κ ∈ {0, 1, 2, 5} bp (baseline 2). Simple benchmark: `--simple` (no EG gate).
@@ -92,7 +95,7 @@ outputs/
   compare/
     metrics.csv                  # EG vs simple join (ΔSharpe), keyed by cost_bp
   paper/
-    tables/                      # unlevered / target-vol / cost-sensitivity CSVs
+    tables/                      # unlevered / occupancy / 3% live-pair vol / cost-sensitivity CSVs
     portfolio/                   # daily / cumulative series at baseline κ=2
     figures/                     # fig01–fig05
 ```

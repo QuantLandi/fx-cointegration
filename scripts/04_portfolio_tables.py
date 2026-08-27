@@ -2,7 +2,8 @@
 
 Applies the RT bp cost grid on panel signals (panels store gross returns).
 Headline tables / equity curves use BASELINE_COST_BP (2 bp); also write the
-full {0,1,2,5} sensitivity.
+full {0,1,2,5} sensitivity. Occupancy / active-day metrics are computed from
+existing signal.csv and zscore.csv (no 02 re-run).
 
 Requires:
   uv run python scripts/02_backtest.py --clear-panels
@@ -80,6 +81,57 @@ def load_portfolio_returns(
         series.append(net.fillna(0.0))
     stacked = pd.concat(series, axis=1).fillna(0.0)
     return stacked.sum(axis=1) / N_PAIRS
+
+
+def load_signal_stack(panels_root: Path, z: float) -> pd.DataFrame:
+    col = z_col(z)
+    series: list[pd.Series] = []
+    for pair_dir in list_pair_dirs(panels_root):
+        sig_df = pd.read_csv(pair_dir / "signal.csv", index_col=0, parse_dates=True)
+        if col not in sig_df.columns:
+            raise KeyError(f"Missing {col} in {pair_dir / 'signal.csv'}")
+        series.append(sig_df[col].rename(pair_dir.name))
+    return pd.concat(series, axis=1).fillna(0.0)
+
+
+def load_zscore_stack(panels_root: Path) -> pd.DataFrame:
+    series: list[pd.Series] = []
+    for pair_dir in list_pair_dirs(panels_root):
+        z_df = pd.read_csv(pair_dir / "zscore.csv", index_col=0, parse_dates=True)
+        if "zscore" not in z_df.columns:
+            raise KeyError(f"Missing zscore in {pair_dir / 'zscore.csv'}")
+        series.append(z_df["zscore"].rename(pair_dir.name))
+    return pd.concat(series, axis=1)
+
+
+def occupancy_metrics(
+    signals: pd.DataFrame, zscores: pd.DataFrame
+) -> dict[str, float | pd.Series]:
+    live = signals.fillna(0.0) != 0
+    n_live = live.sum(axis=1).astype(float)
+    invested = float((n_live / N_PAIRS).mean())
+    active = n_live > 0
+    active_frac = float(active.mean())
+    mean_live_given = float(n_live[active].mean()) if bool(active.any()) else 0.0
+    zs = zscores.reindex(signals.index)
+    gate = float(zs.notna().to_numpy().mean())
+    return {
+        "invested_fraction_pct": invested * 100.0,
+        "active_days_pct": active_frac * 100.0,
+        "mean_live_pairs_given_active": mean_live_given,
+        "gate_occupancy_pct": gate * 100.0,
+        "n_live": n_live,
+    }
+
+
+def active_day_ann_return_pct(rets: pd.Series, n_live: pd.Series) -> float:
+    idx = rets.index.union(n_live.index).sort_values()
+    r = rets.reindex(idx).fillna(0.0)
+    n = n_live.reindex(idx).fillna(0.0)
+    mask = n > 0
+    if not bool(mask.any()):
+        return float("nan")
+    return float(r[mask].mean() * 252.0 * 100.0)
 
 
 def metrics_row(rets: pd.Series, metrics_from_returns) -> dict[str, float]:
@@ -161,6 +213,9 @@ def main() -> None:
     tables_24_rows: list[dict] = []
     target_vol_rows: list[dict] = []
     cost_sens_rows: list[dict] = []
+    occupancy_rows: list[dict] = []
+    zscores_eg = load_zscore_stack(PANELS_EG)
+    zscores_simple = load_zscore_stack(PANELS_SIMPLE)
 
     for cost_bp in bt.COST_BPS:
         for z in Z_THRESHOLDS:
@@ -195,6 +250,25 @@ def main() -> None:
 
             if cost_bp != baseline:
                 continue
+
+            for side, panels, zscores, rets in (
+                ("eg", PANELS_EG, zscores_eg, eg),
+                ("simple", PANELS_SIMPLE, zscores_simple, simple),
+            ):
+                occ = occupancy_metrics(load_signal_stack(panels, z), zscores)
+                n_live = occ.pop("n_live")
+                occupancy_rows.append(
+                    {
+                        "z_threshold": z,
+                        "strategy": side,
+                        **occ,
+                    }
+                )
+                active_ann = active_day_ann_return_pct(rets, n_live)
+                print(
+                    f"  active-day ann. ret. z={z:g} {side}: {active_ann:.4f}% "
+                    f"(print-only; occupancy-diluted calendar return)"
+                )
 
             vol_scale = equal_vol_scale(eg, simple)
             eg_equalvol = eg * vol_scale
@@ -261,10 +335,12 @@ def main() -> None:
     tables_24 = pd.DataFrame(tables_24_rows)
     target_vol = pd.DataFrame(target_vol_rows)
     cost_sens = pd.DataFrame(cost_sens_rows)
+    occupancy = pd.DataFrame(occupancy_rows)
     scale.to_csv(TABLES_DIR / "equal_vol_scale.csv", index=False)
     tables_24.to_csv(TABLES_DIR / "tables_2_4_by_z.csv", index=False)
     target_vol.to_csv(TABLES_DIR / "tables_target_vol_10pct.csv", index=False)
     cost_sens.to_csv(TABLES_DIR / "tables_cost_sensitivity.csv", index=False)
+    occupancy.to_csv(TABLES_DIR / "tables_occupancy.csv", index=False)
 
     # Gross (0) vs baseline side-by-side for the paper.
     gross = cost_sens[cost_sens["cost_bp"] == 0.0]
@@ -310,6 +386,8 @@ def main() -> None:
     print(tables_24.to_string(index=False))
     print("\nCompanion table (10% target ann. vol, ex-post):")
     print(target_vol.to_string(index=False))
+    print("\nOccupancy (from signal.csv / zscore.csv; independent of cost):")
+    print(occupancy.to_string(index=False))
     print("\nSharpe by cost (sensitivity):")
     print(sharpe_cost.to_string(index=False))
 

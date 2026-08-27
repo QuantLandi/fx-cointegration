@@ -87,7 +87,7 @@ def _heatmap(
     cmap: str = "PuOr_r",
     *,
     annotate: bool = False,
-    decimals: int = 1,
+    decimals: int = 2,
 ) -> None:
     fig, ax = plt.subplots(figsize=(7, 6))
     data = df.to_numpy(dtype=float)
@@ -138,7 +138,7 @@ def fig2_sharpe_heatmap() -> None:
         f"Figure 2: Sharpe (κ = {BASELINE_COST_BP:g} bp RT)",
         "fig02_sharpe_heatmap.png",
         annotate=True,
-        decimals=1,
+        decimals=2,
     )
 
 
