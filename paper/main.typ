@@ -79,11 +79,14 @@ across z-score entry thresholds $plus.minus 1$, $plus.minus 2$, and $plus.minus 
 stylized 2~bp round-trip cost on position changes, the unlevered cointegration portfolio
 earns about 0.5% annualized at $plus.minus 1$ (and 0.2–0.3% at wider bands) because capital is
 rarely deployed: invested fraction is about 8% of pair-days at $plus.minus 1$. It still
-delivers higher Sharpe, Sortino, and Calmar ratios than the simple benchmark at every
-threshold, with the largest Sharpe advantage at $plus.minus 1$. The ranking is unchanged
-relative to frictionless (zero-cost) results and survives a grid up to 5~bp. A companion
-that sizes each live pair to 3% train-window volatility still ranks cointegration first
-on Sharpe, with about 4% annualized return at about 8% book volatility.
+delivers higher Sharpe and Sortino ratios than the simple benchmark at every threshold.
+A paired block-bootstrap test of the portfolio Sharpe and Sortino differences finds a
+statistically significant edge at the pre-committed headline threshold $plus.minus 1$;
+at $plus.minus 2$ and $plus.minus 3$ the ranking is consistent in point estimates but not
+statistically separable. The ranking is unchanged relative to frictionless (zero-cost)
+results and survives a grid up to 5~bp. A companion that sizes each live pair to 3%
+train-window volatility still ranks cointegration first on Sharpe, with about 4%
+annualized return at about 8% book volatility.
 
 #v(0.4em)
 #text(size: 10pt)[
@@ -297,10 +300,21 @@ rescale the cointegration path so that *daily* volatilities match the simple pat
 The 21 unordered pairs are not independent experiments. Every leg is a USD cross, and many
 pairs share a second currency, so pair returns comove under common dollar and risk shocks.
 Pair-level Sharpe ratios are therefore descriptive of the
-cross-section, not twenty-one separate hypothesis tests. Our primary evidence is the
+cross-section, not twenty-one separate hypothesis tests. We do not apply multiple-testing
+adjustments or clustered inference to the pair panel. Our primary evidence is the
 *portfolio* comparison of Engle–Granger versus always-trade rules (equal weight $1 \/ 21$),
-which already aggregates those dependent legs. We do not apply multiple-testing adjustments
-or clustered inference to the pair panel.
+which already aggregates those dependent legs. On those two daily portfolio series we test
+whether the Sharpe and Sortino differences are distinguishable from zero with a paired
+circular block bootstrap that resamples calendar dates once and applies the same blocks to
+both books, preserving contemporaneous cross-book correlation
+@ledoitwolf2008. Block length equals the 21-day test window; we studentize the Sharpe
+difference with a Newey–West HAC standard error @neweywest1987 (Bartlett kernel; lag chosen by the
+standard $4(T\/100)^(2\/9)$ rule) and report a percentile interval for the Sortino
+difference (no closed-form HAC under our downside definition: annualized return over the
+standard deviation of strictly negative daily returns). Calmar ratios remain descriptive:
+maximum drawdown is path-dependent, and block reshuffling would scramble that path.
+$plus.minus 1$ is the pre-committed headline design; $plus.minus 2$ and $plus.minus 3$
+are reported alongside it (@tbl:delta-ratios).
 
 = Results
 
@@ -441,6 +455,36 @@ near zero without costs and negative once $kappa >= 1$.
   caption: [Unlevered Sharpe ratios across thresholds after $kappa = 2$~bp RT costs.],
 ) <tbl:sharpe-sum>
 
+@tbl:delta-ratios reports dependence-robust inference on those portfolio gaps after
+$kappa = 2$~bp. At the headline threshold $plus.minus 1$, $Delta$Sharpe is $+0.59$
+($p = 0.014$; 95% studentized CI $[+0.12, +1.07]$) and $Delta$Sortino is $+0.68$
+($p = 0.018$; 95% percentile CI $[+0.12, +1.28]$). At $plus.minus 2$ and $plus.minus 3$
+the cointegration book still leads in point estimates, but the gaps are not statistically
+separable at conventional levels. The $plus.minus 1$ conclusion is unchanged across the
+cost grid $kappa in {0,1,2,5}$ and across block lengths of 5, 21, and 63 days; a HAC
+delta-method Sharpe test @jobsonkorkie1981 @memmel2003 agrees with the bootstrap
+(replication package).
+
+#figure(
+  table(
+    columns: 6,
+    align: (left, left, right, right, right, left),
+    stroke: none,
+    inset: (x: 5pt, y: 4pt),
+    table.hline(),
+    [z], [Statistic], [$Delta$], [$p$], [95% CI], [Method],
+    table.hline(stroke: 0.5pt),
+    [$plus.minus 1$], [Sharpe], [$+$0.59], [0.014], [[+0.12, +1.07]], [Studentized],
+    [], [Sortino], [$+$0.68], [0.018], [[+0.12, +1.28]], [Percentile],
+    [$plus.minus 2$], [Sharpe], [$+$0.35], [0.145], [[−0.14, +0.83]], [Studentized],
+    [], [Sortino], [$+$0.27], [0.270], [[−0.22, +0.73]], [Percentile],
+    [$plus.minus 3$], [Sharpe], [$+$0.37], [0.089], [[−0.07, +0.82]], [Studentized],
+    [], [Sortino], [$+$0.18], [0.332], [[−0.21, +0.46]], [Percentile],
+    table.hline(),
+  ),
+  caption: [Portfolio $Delta$Sharpe and $Delta$Sortino (EG $-$ simple) on the unlevered $1 \/ 21$ book after $kappa = 2$~bp. Paired circular block bootstrap ($B = 10{,}000$; block length 21 days; Newey–West lag 9 for studentized Sharpe). Sortino uses the paper's downside definition (std of strictly negative daily returns) with a percentile interval. $plus.minus 1$ is the pre-committed headline design.],
+) <tbl:delta-ratios>
+
 #figure(
   table(
     columns: 3,
@@ -544,17 +588,18 @@ This study asks whether an Engle–Granger cointegration filter improves FX pair
 among seven liquid USD crosses. On rolling 257/21 windows and 21 unordered pairs, unlevered
 cointegration returns are small (about 0.2–0.5% annualized after 2~bp) because occupancy is
 low: at $plus.minus 1$ the invested fraction is about 8% of pair-days. The filter still
-outperforms the always-trade benchmark on Sharpe, Sortino, and Calmar at
-$z^star in {1,2,3}$, with the strongest Sharpe edge at $plus.minus 1$. The ranking matches
-the frictionless case and remains positive through 5~bp. Sizing each live pair to 3%
-train-window volatility raises cointegration to about 4% annualized return at about 8% book
-vol. Wider thresholds further reduce unlevered volatility and
-drawdowns but shrink occupancy and the incremental Sharpe benefit of the filter.
+leads the always-trade benchmark on Sharpe and Sortino at $z^star in {1,2,3}$ in point
+estimates. A paired block-bootstrap test finds that those risk-adjusted gaps are
+statistically significant at the pre-committed headline threshold $plus.minus 1$, but not
+separable at $plus.minus 2$ or $plus.minus 3$. The ranking matches the frictionless case
+and remains positive through 5~bp. Sizing each live pair to 3% train-window volatility
+raises cointegration to about 4% annualized return at about 8% book vol. Wider thresholds
+further reduce unlevered volatility and drawdowns but shrink occupancy and the incremental
+Sharpe benefit of the filter.
 
 Natural extensions include a broader grid of window lengths and thresholds; parity-based
 screens (PPP or UIP residuals) as alternatives or robustness checks to Engle–Granger;
-accounting for cross-pair dependence when interpreting the 21-pair panel; overnight swap
-costs; and Johansen screens as further robustness.
+overnight swap costs; and Johansen screens as further robustness.
 
 #v(1em)
 *Data and code availability.* Replication code, the frozen Yahoo-derived daily FX

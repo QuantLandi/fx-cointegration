@@ -37,14 +37,16 @@ uv run python scripts/03_compare_strategies.py               # → outputs/compa
 uv run python scripts/04_portfolio_tables.py                 # → outputs/paper/tables|portfolio
 uv run python scripts/05_plot_figures.py                     # → outputs/paper/figures/
 uv run python scripts/06_per_trade_1pct_vol.py --target-vol 0.03  # companion 3% vol per live pair
+uv run python scripts/07_delta_sharpe_bootstrap.py            # portfolio ΔSharpe / ΔSortino inference
 ```
 
 `04_portfolio_tables.py` also refreshes pair `metrics.csv` from existing panels
 (including the `{0,1,2,5}` bp cost grid), so you need not re-run EG just for
-metrics/portfolio tables.
+metrics/portfolio tables. `07_delta_sharpe_bootstrap.py` reads those same panels
+and writes `outputs/paper/tables/tables_delta_sharpe_bootstrap.csv` (no `02` re-run).
 
-**Runtime:** full `02`–`06` on a laptop is typically on the order of **tens of
-minutes** (Engle–Granger screens dominate; `--simple` is faster). Steps `03`–`06`
+**Runtime:** full `02`–`07` on a laptop is typically on the order of **tens of
+minutes** (Engle–Granger screens dominate; `--simple` is faster). Steps `03`–`07`
 are quick once panels exist.
 
 ## Data
