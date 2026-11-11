@@ -46,7 +46,7 @@ metrics/portfolio tables. `07_delta_sharpe_bootstrap.py` reads those same panels
 and writes `outputs/paper/tables/tables_delta_sharpe_bootstrap.csv` (no `02` re-run).
 
 **Runtime:** full `02`–`07` on a laptop is typically on the order of **tens of
-minutes** (Engle–Granger screens dominate; `--simple` is faster). Steps `03`–`07`
+minutes** (Engle–Granger filters dominate; `--simple` is faster). Steps `03`–`07`
 are quick once panels exist.
 
 ## Data
@@ -57,17 +57,17 @@ Daily Yahoo Finance FX spots, 2007-01-01 to 2025-12-31, seven USD crosses
 ## Method (sketch)
 
 1. For each **undirected** pair (21 = C(7,2), alphabetical legs) and rolling
-   train/test window, run an Engle–Granger–style **tradability screen**: both
+   train/test window, run an Engle–Granger–style **tradability filter**: both
    OLS orientations are tested; among passes, keep the clearer residual ADF
    (more negative t-stat) and map the hedge into `log_1 − β·log_2`.
    Level ADF tests stay ordinary (both legs must look I(1)). The residual
    stage uses an ordinary ADF *p*-cutoff of 0.05 as a **pre-committed tuning
-   parameter** (Vidyamurthy-style tradability filter), *not* a size-correct
+   parameter** (Vidyamurthy-style rule), *not* a size-correct
    MacKinnon cointegration test. Formal EG critical values are stricter
    (≈ −3.36 vs ≈ −2.87 at 5% for N=2 with a constant); we keep the looser
    cutoff deliberately and do not claim “cointegration detected at 5%.”
-   Under this rule the screen accepts 917/4683 training windows (19.6%).
-2. If the screen passes, form that spread and standardize with train mean/SD for an
+   Under this rule the filter accepts 917/4683 training windows (19.6%).
+2. If the filter passes, form that spread and standardize with train mean/SD for an
    OOS z-score.
 3. Trade when |z| exceeds a threshold (long spread if z < −z*, short if z > z*).
    Signals are lagged two days.

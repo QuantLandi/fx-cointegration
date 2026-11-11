@@ -1,7 +1,7 @@
 """Rolling Engle-Granger FX pairs backtest (undirected pairs).
 
 21 unordered pairs, train=257, test=21, z in {1, 2, 3}.
-Default: Engle–Granger screen. --simple: always-trade (no EG gate).
+Default: Engle–Granger tradability filter. --simple: always-trade (no EG gate).
 
   uv run python scripts/02_backtest.py --clear-panels
   uv run python scripts/02_backtest.py --simple --clear-panels
@@ -45,11 +45,11 @@ CURRENCIES = (
 
 PAPER_WINDOW = (257, 21)
 Z_THRESHOLDS = (1.0, 2.0, 3.0)
-# Tradability screen cutoffs (not size-correct EG inference).
+# Tradability filter cutoffs (not size-correct EG inference).
 # Level ADF: both log prices must look I(1). Residual ADF: OLS residual
 # p-value must clear RESIDUAL_ADF_PMAX. Because β is estimated, that residual
 # cutoff is *not* a MacKinnon cointegration test; it is a pre-committed
-# permissive filter in the Vidyamurthy tradability-screen sense.
+# permissive filter in the Vidyamurthy tradability-filter sense.
 LEVEL_ADF_PMIN = 0.05
 RESIDUAL_ADF_PMAX = 0.05
 # Round-trip bp of pair notional; charge (κ/1e4)*|Δs|/2 per day.
@@ -60,7 +60,7 @@ BASELINE_COST_BP = 2.0
 def engle_granger_detail(
     y: pd.Series, x: pd.Series
 ) -> tuple[bool, float | None, float | None]:
-    """EG-style tradability screen (permissive residual ADF cutoff).
+    """EG-style tradability filter (permissive residual ADF cutoff).
 
     Returns (passed, slope_on_x, residual_adf_stat).
 
@@ -85,7 +85,7 @@ def engle_granger_detail(
 
 
 def ols_hedge(y: pd.Series, x: pd.Series) -> float:
-    """OLS hedge ratio (slope on x) with no cointegration screen."""
+    """OLS hedge ratio (slope on x) with no tradability filter."""
     return float(sm.OLS(y, sm.add_constant(x)).fit().params.iloc[1])
 
 
@@ -105,7 +105,7 @@ def choose_hedge(
     """Alphabetical hedge γ for spread log_1 - γ log_2, or None if flat.
 
     Legs are already alphabetical. If ``require_coint``, run the EG-style
-    tradability screen on both OLS orientations and keep the passing residual
+    tradability filter on both OLS orientations and keep the passing residual
     with the more negative ADF statistic (map reverse orientation into the
     alphabetical spread). If ``require_coint`` is False, always use OLS of
     log_1 on log_2.
@@ -375,7 +375,7 @@ def run_grid(
 
     if require_coint:
         print(
-            "Window screen: "
+            "Window filter: "
             f"{totals['passed']}/{totals['windows']} passed EG, "
             f"{totals['skipped_eg']} failed EG, "
             f"{totals['skipped_std']} skipped (zero/NaN train std)",
@@ -383,7 +383,7 @@ def run_grid(
         )
     else:
         print(
-            "Window screen (simple, no EG gate): "
+            "Window filter (simple, no EG gate): "
             f"{totals['passed']}/{totals['windows']} active, "
             f"{totals['skipped_std']} skipped (zero/NaN train std)",
             flush=True,
@@ -422,7 +422,7 @@ def write_metrics_provenance(
         "pair_universe": "undirected_alphabetical",
         "level_adf_pmin": LEVEL_ADF_PMIN,
         "residual_adf_pmax": RESIDUAL_ADF_PMAX,
-        "eg_residual_pvalue": "ordinary_adf_tradability_screen_not_mackinnon",
+        "eg_residual_pvalue": "ordinary_adf_tradability_filter_not_mackinnon",
         "signal_lag_days": 2,
         "pnl": "equal_notional_r1_minus_r2",
         "panels_strategy_return": "gross_zero_cost",
@@ -437,7 +437,7 @@ def main() -> None:
     parser.add_argument(
         "--simple",
         action="store_true",
-        help="Simple pairs (no EG screen). Writes outputs/simple/.",
+        help="Simple pairs (no EG filter). Writes outputs/simple/.",
     )
     parser.add_argument(
         "--clear-panels",

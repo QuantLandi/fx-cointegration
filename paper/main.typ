@@ -74,7 +74,7 @@ pairs strategy selects pairs whose residual spread looks mean-reverting enough t
 short-term divergences are more plausibly exploitable. This paper studies whether that
 filter improves risk-adjusted performance in the foreign-exchange market. Using daily spot
 prices for the seven most liquid USD crosses over 2007–2025, we compare a simple always-trade
-pairs rule with an Engle–Granger–style *tradability screen* on rolling 257/21-day train/test
+pairs rule with an Engle–Granger–style *tradability filter* on rolling 257/21-day train/test
 windows, across z-score entry thresholds $plus.minus 1$, $plus.minus 2$, and $plus.minus 3$.
 Charging a stylized 2~bp round-trip cost on position changes, the unlevered cointegration
 portfolio earns about 0.5% annualized at $plus.minus 1$ (and 0.2–0.3% at wider bands)
@@ -117,7 +117,7 @@ relations such as purchasing-power parity and interest-rate parity
 *plausible*; they do not, by themselves, deliver a trading rule. We therefore keep the
 empirical design statistical: we compare (i) a *simple* pairs strategy that always trades
 the synthetic spread on every out-of-sample block with (ii) a *cointegration-based*
-strategy that trades only when an Engle–Granger–style tradability screen passes on the
+strategy that trades only when an Engle–Granger–style tradability filter passes on the
 preceding training window. The universe comprises all unordered pairs among seven USD-denominated
 majors ($C(7,2) = 21$ pairs). Performance is evaluated with annualized return and
 volatility, Sharpe, Sortino, and Calmar ratios, and maximum drawdown
@@ -146,7 +146,7 @@ spread and a risk-free asset, obtaining closed-form policies under Ornstein–Uh
 uncertainty.
 
 @vidyamurthy2004 provides the cointegration blueprint: pair preselection, Engle–Granger
-tradability screening, and nonparametric entry/exit rules. @rad2015 implement distance
+tradability filtering, and nonparametric entry/exit rules. @rad2015 implement distance
 preselection plus Engle–Granger and find return profiles similar to pure distance methods.
 @galenko2012 use multivariate cointegration weights on ETF baskets and document
 mean-reverting portfolio returns, with the usual caveat that performance can weaken outside
@@ -176,7 +176,7 @@ AUD/USD, and NZD/USD from Yahoo Finance @yahoo2024, January 1, 2007 to December 
 Prices are processed in rolling blocks: a training window of $n = 257$ days (about one year)
 followed by a testing window of $m = 21$ days (about one month). After each test block,
 windows advance by $m$ days so the next train ends where the previous test ended
-(@fig:schematic). The training sample is used to (i) run the tradability screen when required
+(@fig:schematic). The training sample is used to (i) run the tradability filter when required
 and (ii) estimate the spread mean and standard deviation used in the out-of-sample z-score.
 The simple strategy skips (i) but still uses the training moments.
 
@@ -187,7 +187,7 @@ The simple strategy skips (i) but still uses the training moments.
 
 == Economic motivation
 
-Why should an Engle–Granger screen be more than a statistical filter among 21 correlated
+Why should an Engle–Granger filter be more than a statistical device among 21 correlated
 USD crosses? Purchasing-power parity (PPP) links national price levels to exchange rates;
 although real exchange rates mean-revert only slowly, the associated “PPP puzzle” still
 implies that related nominal rates are not free to wander independently forever
@@ -201,14 +201,14 @@ cointegration-based relative-value trading—economically plausible in this univ
 
 Importantly, we do *not* estimate PPP baskets, trade real-exchange-rate gaps, or form
 positions from UIP residuals. The trading object remains a bivariate log-price spread among
-unordered XXXUSD majors, gated by the Engle–Granger screen described below. Parity
+unordered XXXUSD majors, gated by the Engle–Granger filter described below. Parity
 relations motivate *where* we look; the pre-committed EG rule determines *when* we trade.
-At this stage, parity-based screens are left as a natural extension.
+At this stage, parity-based filters are left as a natural extension.
 
 == Cointegration analysis
 
 We gate trading with the Engle–Granger two-step procedure @engle1987, used here as a
-*tradability screen* in the sense of @vidyamurthy2004 rather than as a formal size-correct
+*tradability filter* in the sense of @vidyamurthy2004 rather than as a formal size-correct
 cointegration test. Johansen methods can recover multiple relations in larger systems; for
 bivariate FX pairs we prefer the Engle–Granger blueprint for transparency and leave Johansen
 to future work.
@@ -234,7 +234,7 @@ trade the spread out of sample.
 
 Cointegration is a *relation*, not a directed trading object, so we work with
 $C(7,2) = 21$ unordered pairs. Legs are ordered alphabetically by ticker so that each
-pair has a unique synthetic spread $log P^(1) - beta log P^(2)$. The residual screen can
+pair has a unique synthetic spread $log P^(1) - beta log P^(2)$. The residual filter can
 depend on which series is the regressand; as a fixed design choice we therefore run *both*
 OLS orientations on each training window and, among those that clear the residual cutoff,
 retain the orientation with the clearer residual ADF statistic (more negative $t$-stat),
@@ -270,7 +270,7 @@ a caveat (short test windows and frequent flats keep overnight exposure limited)
 *Simple pairs.* Trade every testing window for every unordered pair, using training moments
 only for the z-score (alphabetical OLS hedge, no cointegration gate).
 
-*Cointegration-based pairs.* Trade a testing window only if the tradability screen
+*Cointegration-based pairs.* Trade a testing window only if the tradability filter
 above passes on the preceding training window; otherwise the pair is flat.
 
 Pair returns are summed and divided by 21 to form a standardized portfolio. Main tables
@@ -560,7 +560,7 @@ figures explain the tiny unlevered volatilities.
     [], [Simple], [5.72], [38.15], [3.15], [94.72],
     table.hline(),
   ),
-  caption: [Portfolio occupancy from lagged signals (independent of $kappa$). Invested fraction is the mean across days of live pairs~$\/ 21$; active days are days with at least one live pair; live $|$ active is the mean number of live pairs on those days; gate occupancy is the share of pair-days with a non-NaN z-score (tradability-screen pass). Occupancy explains why unlevered volatility is small.],
+  caption: [Portfolio occupancy from lagged signals (independent of $kappa$). Invested fraction is the mean across days of live pairs~$\/ 21$; active days are days with at least one live pair; live $|$ active is the mean number of live pairs on those days; gate occupancy is the share of pair-days with a non-NaN z-score (tradability-filter pass). Occupancy explains why unlevered volatility is small.],
 ) <tbl:occupancy>
 
 @tbl:livevol3 applies that rule after $kappa = 2$~bp at $z^star in {1,2,3}$. Both strategies
@@ -594,7 +594,7 @@ leads on Sharpe; simple has higher raw return because more pairs are live.
 
 = Conclusions and future research
 
-This study asks whether an Engle–Granger–style tradability screen improves FX pairs trading
+This study asks whether an Engle–Granger–style tradability filter improves FX pairs trading
 among seven liquid USD crosses. On rolling 257/21 windows and 21 unordered pairs, unlevered
 cointegration-book returns are small (about 0.2–0.5% annualized after 2~bp) because occupancy
 is low: at $plus.minus 1$ the invested fraction is about 8% of pair-days. The filter still
@@ -607,11 +607,11 @@ raises cointegration to about 4% annualized return at about 8% book vol. Wider t
 further reduce unlevered volatility and drawdowns but shrink occupancy and the incremental
 Sharpe benefit of the filter.
 
-The residual stage of the screen uses an ordinary ADF cutoff as a fixed tradability rule, not
+The residual stage of the filter uses an ordinary ADF cutoff as a fixed tradability rule, not
 as a MacKinnon-sized claim that cointegration was detected at 5%. Tightening that cutoff to
 formal Engle–Granger critical values is a natural robustness check; so are a broader grid of
-window lengths and thresholds, parity-based screens (PPP or UIP residuals), overnight swap
-costs, and Johansen screens.
+window lengths and thresholds, parity-based filters (PPP or UIP residuals), overnight swap
+costs, and Johansen filters.
 
 #v(1em)
 *Data and code availability.* Replication code, the frozen Yahoo-derived daily FX
