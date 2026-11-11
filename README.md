@@ -1,16 +1,14 @@
 # FX cointegration pairs trading
 
-Replication code and short *Finance Research Letters* manuscript for Lemishko,
+Replication code and short *Finance Research Letters* letter for Lemishko,
 Landi & Caicedo-Llano, *Does a Cointegration Filter Help in Forex Pairs Trading?*
 (November 2026; frozen sample through 2025-12-31). Preprint landing page:
 [SSRN](https://ssrn.com/abstract=4771108). If the SSRN PDF lags this repository,
-treat `paper/main.pdf` (or the EM-identical `paper/letter.pdf`) and the frozen
-parquet here as authoritative for current numbers.
+treat `paper/letter.pdf` and the frozen parquet here as authoritative for current
+numbers.
 
-**Manuscript layout under `paper/`:**
-- **`main.typ` / `main.pdf`** — primary public short letter (FRL)
-- **`letter.tex` / `letter.pdf` + `Figure_1.png`** — same letter in LaTeX (upload twin)
-- **`working_paper.typ` / `working_paper.pdf`** — archived longer draft (prior IRFA-era rewrite)
+**Manuscript under `paper/`:** `letter.tex` / `letter.pdf` + `Figure_1.png` (short FRL
+letter; LaTeX sources for EM).
 
 Please cite this repository via GitHub **Cite this repository** /
 [`CITATION.cff`](CITATION.cff).
@@ -122,15 +120,14 @@ flat days are 0. Net returns apply `(κ/1e4)·|Δsignal|/2` in metrics and `04`.
 `outputs/` and `local/` are gitignored. Optional local checks (JAE table
 tolerances, notebook spot checks) live under `local/`.
 
-Manuscript: short FRL letter in `paper/main.typ` / `paper/main.pdf` (LaTeX twin
-`paper/letter.tex` / `paper/letter.pdf`). Longer archived draft:
-`paper/working_paper.typ`. Pipeline figures regenerate under `outputs/paper/figures`
-and are copied into `paper/figures` as needed.
+Manuscript: short FRL letter in `paper/letter.tex` / `paper/letter.pdf` (figure
+`paper/Figure_1.png`). Pipeline figures regenerate under `outputs/paper/figures`
+(gitignored `outputs/`); only the letter figure is kept in `paper/`.
 
 ## License
 
 - **Code, scripts, `pyproject.toml`, `uv.lock`, and `data/`:** [MIT](LICENSE)
-- **Manuscript assets under `paper/`** (Typst source, PDF, figures, bibliography):
+- **Manuscript assets under `paper/`** (LaTeX source, PDF, figures, bibliography):
   [CC BY 4.0](paper/LICENSE)
 
 The frozen parquet in `data/` is a derived replication sample built from Yahoo
