@@ -70,23 +70,23 @@
 #v(0.3em)
 
 Pairs trading exploits pricing differentials between related assets. A cointegration-based
-pairs strategy selects pairs that share a statistically significant long-run relationship, so that
-short-term divergences are more plausibly mean-reverting. This paper studies whether that
+pairs strategy selects pairs whose residual spread looks mean-reverting enough to trade, so that
+short-term divergences are more plausibly exploitable. This paper studies whether that
 filter improves risk-adjusted performance in the foreign-exchange market. Using daily spot
 prices for the seven most liquid USD crosses over 2007–2025, we compare a simple always-trade
-pairs rule with an Engle–Granger cointegration screen on rolling 257/21-day train/test windows,
-across z-score entry thresholds $plus.minus 1$, $plus.minus 2$, and $plus.minus 3$. Charging a
-stylized 2~bp round-trip cost on position changes, the unlevered cointegration portfolio
-earns about 0.5% annualized at $plus.minus 1$ (and 0.2–0.3% at wider bands) because capital is
-rarely deployed: invested fraction is about 8% of pair-days at $plus.minus 1$. It still
-delivers higher Sharpe and Sortino ratios than the simple benchmark at every threshold.
-A paired block-bootstrap test of the portfolio Sharpe and Sortino differences finds a
-statistically significant edge at the pre-committed headline threshold $plus.minus 1$;
-at $plus.minus 2$ and $plus.minus 3$ the ranking is consistent in point estimates but not
-statistically separable. The ranking is unchanged relative to frictionless (zero-cost)
-results and survives a grid up to 5~bp. A companion that sizes each live pair to 3%
-train-window volatility still ranks cointegration first on Sharpe, with about 4%
-annualized return at about 8% book volatility.
+pairs rule with an Engle–Granger–style *tradability screen* on rolling 257/21-day train/test
+windows, across z-score entry thresholds $plus.minus 1$, $plus.minus 2$, and $plus.minus 3$.
+Charging a stylized 2~bp round-trip cost on position changes, the unlevered cointegration
+portfolio earns about 0.5% annualized at $plus.minus 1$ (and 0.2–0.3% at wider bands)
+because capital is rarely deployed: invested fraction is about 8% of pair-days at
+$plus.minus 1$. It still delivers higher Sharpe and Sortino ratios than the simple
+benchmark at every threshold. A paired block-bootstrap test of the portfolio Sharpe and
+Sortino differences finds a statistically significant edge at the pre-committed headline
+threshold $plus.minus 1$; at $plus.minus 2$ and $plus.minus 3$ the ranking is consistent
+in point estimates but not statistically separable. The ranking is unchanged relative to
+frictionless (zero-cost) results and survives a grid up to 5~bp. A companion that sizes each
+live pair to 3% train-window volatility still ranks cointegration first on Sharpe, with
+about 4% annualized return at about 8% book volatility.
 
 #v(0.4em)
 #text(size: 10pt)[
@@ -117,8 +117,8 @@ relations such as purchasing-power parity and interest-rate parity
 *plausible*; they do not, by themselves, deliver a trading rule. We therefore keep the
 empirical design statistical: we compare (i) a *simple* pairs strategy that always trades
 the synthetic spread on every out-of-sample block with (ii) a *cointegration-based*
-strategy that trades only when Engle–Granger cointegration is detected on the preceding
-training window. The universe comprises all unordered pairs among seven USD-denominated
+strategy that trades only when an Engle–Granger–style tradability screen passes on the
+preceding training window. The universe comprises all unordered pairs among seven USD-denominated
 majors ($C(7,2) = 21$ pairs). Performance is evaluated with annualized return and
 volatility, Sharpe, Sortino, and Calmar ratios, and maximum drawdown
 @sharpe1966 @sortino1991 @young1991 on *unlevered* portfolios, together with invested-fraction
@@ -176,7 +176,7 @@ AUD/USD, and NZD/USD from Yahoo Finance @yahoo2024, January 1, 2007 to December 
 Prices are processed in rolling blocks: a training window of $n = 257$ days (about one year)
 followed by a testing window of $m = 21$ days (about one month). After each test block,
 windows advance by $m$ days so the next train ends where the previous test ended
-(@fig:schematic). The training sample is used to (i) screen for cointegration when required
+(@fig:schematic). The training sample is used to (i) run the tradability screen when required
 and (ii) estimate the spread mean and standard deviation used in the out-of-sample z-score.
 The simple strategy skips (i) but still uses the training moments.
 
@@ -207,9 +207,11 @@ At this stage, parity-based screens are left as a natural extension.
 
 == Cointegration analysis
 
-We test long-run co-movement with the Engle–Granger procedure @engle1987. Johansen
-methods can recover multiple relations in larger systems; for bivariate FX pairs we prefer
-Engle–Granger for transparency and leave Johansen to future work.
+We gate trading with the Engle–Granger two-step procedure @engle1987, used here as a
+*tradability screen* in the sense of @vidyamurthy2004 rather than as a formal size-correct
+cointegration test. Johansen methods can recover multiple relations in larger systems; for
+bivariate FX pairs we prefer the Engle–Granger blueprint for transparency and leave Johansen
+to future work.
 
 *Step 1.* Augmented Dickey–Fuller (ADF) tests on each log-price series. Failure to reject
 the unit-root null supports treating both series as $I(1)$.
@@ -218,18 +220,26 @@ the unit-root null supports treating both series as $I(1)$.
 $ y_t = alpha + beta x_t + epsilon_t $ <eq:ols>
 with residual $ hat(epsilon)_t = y_t - hat(beta) x_t - hat(alpha) $.
 
-*Step 3.* ADF test on $hat(epsilon)_t$. Rejecting the residual unit-root null is evidence of
-cointegration: $y_t$ and $x_t$ share a stationary combination even though each is
-non-stationary. The hedge ratio $hat(beta)$ defines the synthetic spread.
+*Step 3.* ADF test on $hat(epsilon)_t$. We pass the window when the residual ADF
+$p$-value is at most $0.05$ and use $hat(beta)$ as the hedge ratio for the synthetic
+spread. Because $beta$ is estimated rather than known, that residual statistic does *not*
+follow the Dickey–Fuller distribution of Step 1: a size-correct Engle–Granger test would
+compare it against MacKinnon cointegration critical values, which are stricter
+(@mackinnon1994 @mackinnon2010; about $-3.36$ versus $-2.87$ at the conventional 5% level
+for $N = 2$ with a constant on our 257-day windows). We deliberately keep the looser
+ordinary-ADF residual cutoff as a *pre-committed tuning parameter* that controls how
+permissive the filter is. We do not claim that a pass means “cointegration detected at
+5%”; a pass means the residual looks stationary enough, under this operational rule, to
+trade the spread out of sample.
 
 Cointegration is a *relation*, not a directed trading object, so we work with
 $C(7,2) = 21$ unordered pairs. Legs are ordered alphabetically by ticker so that each
-pair has a unique synthetic spread $log P^(1) - beta log P^(2)$. The Engle–Granger
-residual can depend on which series is the regressand; as a fixed design choice we
-therefore test *both* OLS orientations on each training window and, among those that
-pass at 5%, retain the orientation with the clearer residual ADF statistic (more negative
-$t$-stat), mapping that hedge into the alphabetical spread. If neither orientation passes,
-the pair is flat for the following test window.
+pair has a unique synthetic spread $log P^(1) - beta log P^(2)$. The residual screen can
+depend on which series is the regressand; as a fixed design choice we therefore run *both*
+OLS orientations on each training window and, among those that clear the residual cutoff,
+retain the orientation with the clearer residual ADF statistic (more negative $t$-stat),
+mapping that hedge into the alphabetical spread. If neither orientation passes, the pair
+is flat for the following test window.
 
 == Mean-reversion strategy
 
@@ -260,8 +270,8 @@ a caveat (short test windows and frequent flats keep overnight exposure limited)
 *Simple pairs.* Trade every testing window for every unordered pair, using training moments
 only for the z-score (alphabetical OLS hedge, no cointegration gate).
 
-*Cointegration-based pairs.* Trade a testing window only if the Engle–Granger screen
-above accepts cointegration on the preceding training window; otherwise the pair is flat.
+*Cointegration-based pairs.* Trade a testing window only if the tradability screen
+above passes on the preceding training window; otherwise the pair is flat.
 
 Pair returns are summed and divided by 21 to form a standardized portfolio. Main tables
 report these series *unlevered* and, unless noted, *after* $kappa = 2$~bp costs. Occupancy is
@@ -550,7 +560,7 @@ figures explain the tiny unlevered volatilities.
     [], [Simple], [5.72], [38.15], [3.15], [94.72],
     table.hline(),
   ),
-  caption: [Portfolio occupancy from lagged signals (independent of $kappa$). Invested fraction is the mean across days of live pairs~$\/ 21$; active days are days with at least one live pair; live $|$ active is the mean number of live pairs on those days; gate occupancy is the share of pair-days with a non-NaN z-score (Engle–Granger pass). Occupancy explains why unlevered volatility is small.],
+  caption: [Portfolio occupancy from lagged signals (independent of $kappa$). Invested fraction is the mean across days of live pairs~$\/ 21$; active days are days with at least one live pair; live $|$ active is the mean number of live pairs on those days; gate occupancy is the share of pair-days with a non-NaN z-score (tradability-screen pass). Occupancy explains why unlevered volatility is small.],
 ) <tbl:occupancy>
 
 @tbl:livevol3 applies that rule after $kappa = 2$~bp at $z^star in {1,2,3}$. Both strategies
@@ -573,7 +583,7 @@ leads on Sharpe; simple has higher raw return because more pairs are live.
     table.hline(stroke: 0.5pt),
     [$plus.minus 1$], [Cointegration], [3.87], [8.29], [0.47], [0.79], [0.20], [$-$18.9],
     [], [Simple], [1.91], [21.97], [0.09], [0.11], [0.03], [$-$68.0],
-    [$plus.minus 2$], [Cointegration], [1.65], [4.15], [0.40], [0.35], [0.17], [$-$9.75],
+    [$plus.minus 2$], [Cointegration], [1.65], [4.15], [0.40], [0.35], [0.17], [$-$9.8],
     [], [Simple], [2.21], [14.42], [0.15], [0.17], [0.06], [$-$37.2],
     [$plus.minus 3$], [Cointegration], [1.24], [3.12], [0.40], [0.22], [0.12], [$-$10.6],
     [], [Simple], [2.17], [9.81], [0.22], [0.18], [0.08], [$-$28.0],
@@ -584,10 +594,10 @@ leads on Sharpe; simple has higher raw return because more pairs are live.
 
 = Conclusions and future research
 
-This study asks whether an Engle–Granger cointegration filter improves FX pairs trading
+This study asks whether an Engle–Granger–style tradability screen improves FX pairs trading
 among seven liquid USD crosses. On rolling 257/21 windows and 21 unordered pairs, unlevered
-cointegration returns are small (about 0.2–0.5% annualized after 2~bp) because occupancy is
-low: at $plus.minus 1$ the invested fraction is about 8% of pair-days. The filter still
+cointegration-book returns are small (about 0.2–0.5% annualized after 2~bp) because occupancy
+is low: at $plus.minus 1$ the invested fraction is about 8% of pair-days. The filter still
 leads the always-trade benchmark on Sharpe and Sortino at $z^star in {1,2,3}$ in point
 estimates. A paired block-bootstrap test finds that those risk-adjusted gaps are
 statistically significant at the pre-committed headline threshold $plus.minus 1$, but not
@@ -597,9 +607,11 @@ raises cointegration to about 4% annualized return at about 8% book vol. Wider t
 further reduce unlevered volatility and drawdowns but shrink occupancy and the incremental
 Sharpe benefit of the filter.
 
-Natural extensions include a broader grid of window lengths and thresholds; parity-based
-screens (PPP or UIP residuals) as alternatives or robustness checks to Engle–Granger;
-overnight swap costs; and Johansen screens as further robustness.
+The residual stage of the screen uses an ordinary ADF cutoff as a fixed tradability rule, not
+as a MacKinnon-sized claim that cointegration was detected at 5%. Tightening that cutoff to
+formal Engle–Granger critical values is a natural robustness check; so are a broader grid of
+window lengths and thresholds, parity-based screens (PPP or UIP residuals), overnight swap
+costs, and Johansen screens.
 
 #v(1em)
 *Data and code availability.* Replication code, the frozen Yahoo-derived daily FX

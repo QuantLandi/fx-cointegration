@@ -45,6 +45,13 @@ CURRENCIES = (
 
 PAPER_WINDOW = (257, 21)
 Z_THRESHOLDS = (1.0, 2.0, 3.0)
+# Tradability screen cutoffs (not size-correct EG inference).
+# Level ADF: both log prices must look I(1). Residual ADF: OLS residual
+# p-value must clear RESIDUAL_ADF_PMAX. Because β is estimated, that residual
+# cutoff is *not* a MacKinnon cointegration test; it is a pre-committed
+# permissive filter in the Vidyamurthy tradability-screen sense.
+LEVEL_ADF_PMIN = 0.05
+RESIDUAL_ADF_PMAX = 0.05
 # Round-trip bp of pair notional; charge (κ/1e4)*|Δs|/2 per day.
 COST_BPS = (0.0, 1.0, 2.0, 5.0)
 BASELINE_COST_BP = 2.0
@@ -53,17 +60,26 @@ BASELINE_COST_BP = 2.0
 def engle_granger_detail(
     y: pd.Series, x: pd.Series
 ) -> tuple[bool, float | None, float | None]:
-    """EG screen at 5%.
+    """EG-style tradability screen (permissive residual ADF cutoff).
 
     Returns (passed, slope_on_x, residual_adf_stat).
-    ADF defaults: regression='c', autolag='AIC'. Both legs must fail to reject
-    a unit root (p > 0.05); residual must reject (p <= 0.05).
+
+    Step 1: ordinary ADF on each *observed* log-price level (regression='c',
+    autolag='AIC'); both legs must fail to reject a unit root
+    (p > LEVEL_ADF_PMIN).
+
+    Steps 2-3: OLS cointegrating regression, then ADF on the residual. Pass if
+    residual ADF p <= RESIDUAL_ADF_PMAX. This is *not* a size-correct
+    Engle-Granger cointegration test: MacKinnon critical values for estimated
+    residuals are stricter (~-3.36 vs ~-2.87 at 5% for N=2 with a constant).
+    The residual cutoff is a fixed tradability filter, not a formal claim that
+    cointegration was detected at 5%.
     """
-    if adfuller(y)[1] <= 0.05 or adfuller(x)[1] <= 0.05:
+    if adfuller(y)[1] <= LEVEL_ADF_PMIN or adfuller(x)[1] <= LEVEL_ADF_PMIN:
         return False, None, None
     fit = sm.OLS(y, sm.add_constant(x)).fit()
     adf_stat, adf_p, *_ = adfuller(fit.resid)
-    if adf_p > 0.05:
+    if adf_p > RESIDUAL_ADF_PMAX:
         return False, None, None
     return True, float(fit.params.iloc[1]), float(adf_stat)
 
@@ -88,10 +104,11 @@ def choose_hedge(
 ) -> float | None:
     """Alphabetical hedge γ for spread log_1 - γ log_2, or None if flat.
 
-    Legs are already alphabetical. If ``require_coint``, run Engle–Granger on
-    both OLS orientations and keep the passing residual with the more negative
-    ADF statistic (map reverse orientation into the alphabetical spread). If
-    ``require_coint`` is False, always use OLS of log_1 on log_2.
+    Legs are already alphabetical. If ``require_coint``, run the EG-style
+    tradability screen on both OLS orientations and keep the passing residual
+    with the more negative ADF statistic (map reverse orientation into the
+    alphabetical spread). If ``require_coint`` is False, always use OLS of
+    log_1 on log_2.
     """
     if not require_coint:
         return ols_hedge(log_1, log_2)
@@ -403,6 +420,9 @@ def write_metrics_provenance(
             len(undirected_pairs()) * len(Z_THRESHOLDS) * len(COST_BPS)
         ),
         "pair_universe": "undirected_alphabetical",
+        "level_adf_pmin": LEVEL_ADF_PMIN,
+        "residual_adf_pmax": RESIDUAL_ADF_PMAX,
+        "eg_residual_pvalue": "ordinary_adf_tradability_screen_not_mackinnon",
         "signal_lag_days": 2,
         "pnl": "equal_notional_r1_minus_r2",
         "panels_strategy_return": "gross_zero_cost",

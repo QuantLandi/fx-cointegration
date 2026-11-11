@@ -57,10 +57,17 @@ Daily Yahoo Finance FX spots, 2007-01-01 to 2025-12-31, seven USD crosses
 ## Method (sketch)
 
 1. For each **undirected** pair (21 = C(7,2), alphabetical legs) and rolling
-   train/test window, screen log prices with Engle–Granger at 5%: both OLS
-   orientations are tested; among passes, keep the clearer residual ADF
+   train/test window, run an Engle–Granger–style **tradability screen**: both
+   OLS orientations are tested; among passes, keep the clearer residual ADF
    (more negative t-stat) and map the hedge into `log_1 − β·log_2`.
-2. If cointegrated, form that spread and standardize with train mean/SD for an
+   Level ADF tests stay ordinary (both legs must look I(1)). The residual
+   stage uses an ordinary ADF *p*-cutoff of 0.05 as a **pre-committed tuning
+   parameter** (Vidyamurthy-style tradability filter), *not* a size-correct
+   MacKinnon cointegration test. Formal EG critical values are stricter
+   (≈ −3.36 vs ≈ −2.87 at 5% for N=2 with a constant); we keep the looser
+   cutoff deliberately and do not claim “cointegration detected at 5%.”
+   Under this rule the screen accepts 917/4683 training windows (19.6%).
+2. If the screen passes, form that spread and standardize with train mean/SD for an
    OOS z-score.
 3. Trade when |z| exceeds a threshold (long spread if z < −z*, short if z > z*).
    Signals are lagged two days.
