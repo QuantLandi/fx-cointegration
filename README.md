@@ -1,11 +1,16 @@
 # FX cointegration pairs trading
 
-Replication code and Typst manuscript for Lemishko, Landi & Caicedo-Llano,
-*Cointegration-Based Strategies in Forex Pairs Trading* (August 2026 rewrite;
-frozen sample through 2025-12-31). Working-paper landing page:
+Replication code and short *Finance Research Letters* manuscript for Lemishko,
+Landi & Caicedo-Llano, *Does a Cointegration Filter Help in Forex Pairs Trading?*
+(November 2026; frozen sample through 2025-12-31). Preprint landing page:
 [SSRN](https://ssrn.com/abstract=4771108). If the SSRN PDF lags this repository,
-treat `paper/main.typ` / `paper/main.pdf` and the frozen parquet here as
-authoritative for current numbers.
+treat `paper/main.pdf` (or the EM-identical `paper/letter.pdf`) and the frozen
+parquet here as authoritative for current numbers.
+
+**Manuscript layout under `paper/`:**
+- **`main.typ` / `main.pdf`** — primary public short letter (FRL)
+- **`letter.tex` / `letter.pdf` + `Figure_1.png`** — same letter in LaTeX (upload twin)
+- **`working_paper.typ` / `working_paper.pdf`** — archived longer draft (prior IRFA-era rewrite)
 
 Please cite this repository via GitHub **Cite this repository** /
 [`CITATION.cff`](CITATION.cff).
@@ -117,8 +122,10 @@ flat days are 0. Net returns apply `(κ/1e4)·|Δsignal|/2` in metrics and `04`.
 `outputs/` and `local/` are gitignored. Optional local checks (JAE table
 tolerances, notebook spot checks) live under `local/`.
 
-Manuscript: `paper/main.typ` (compiled PDF: `paper/main.pdf`; figures via
-`paper/figures`, regenerated from `outputs/paper/figures`).
+Manuscript: short FRL letter in `paper/main.typ` / `paper/main.pdf` (LaTeX twin
+`paper/letter.tex` / `paper/letter.pdf`). Longer archived draft:
+`paper/working_paper.typ`. Pipeline figures regenerate under `outputs/paper/figures`
+and are copied into `paper/figures` as needed.
 
 ## License
 

@@ -1,4 +1,4 @@
-• Unlevered EG earns ~0.5% at z*=1 with ~8% invested fraction after 2 bp
-• EG filter still beats always-trade FX pairs on Sharpe at z*=1,2,3
-• Sharpe ranking unchanged from 0 to 5 bp stylized round-trip costs
-• Open replication: frozen Yahoo sample and uv pipeline on GitHub
+• EG-style FX pairs filter beats always-trade on Sharpe at z*=±1
+• ΔSharpe +0.59 (p=0.014) after 2 bp; occupancy only ~8% of pair-days
+• ±1 risk-adjusted edge survives stylized costs from 0 to 5 bp
+• Open replication: frozen Yahoo panel and uv pipeline on GitHub

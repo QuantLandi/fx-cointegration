@@ -1,15 +1,16 @@
 cff-version: 1.2.0
 message: >-
   If you use this replication package, please cite it using the metadata below.
-  Prefer the working-paper / SSRN entry for the manuscript; the Typst draft in
+  Prefer the short letter / SSRN entry for the manuscript; paper/main.pdf in
   this repository (sample through 2025-12-31) supersedes older SSRN PDF numbers
   if they diverge.
 type: software
 title: "FX cointegration pairs trading — replication package"
 abstract: >-
-  Replication code and Typst manuscript for cointegration-based FX pairs trading
-  on seven liquid USD crosses (2007–2025), comparing an Engle–Granger screen to
-  an always-trade benchmark under stylized round-trip costs.
+  Replication code and short FRL letter for cointegration-filter FX pairs trading
+  on seven liquid USD crosses (2007–2025), comparing an Engle–Granger–style
+  tradability filter to an always-trade benchmark under stylized round-trip costs.
+
 authors:
   - family-names: Lemishko
     given-names: Tetiana
@@ -31,7 +32,7 @@ contact:
     email: alexandre1.landi@skema.edu
 preferred-citation:
   type: article
-  title: "Cointegration-Based Strategies in Forex Pairs Trading"
+  title: "Does a Cointegration Filter Help in Forex Pairs Trading?"
   authors:
     - family-names: Lemishko
       given-names: Tetiana
